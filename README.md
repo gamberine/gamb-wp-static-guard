@@ -4,7 +4,7 @@
 
 Extensão para WordPress destinada à geração de sites estáticos, à publicação em diretório local ou arquivo ZIP e à redução da exposição de informações técnicas na saída pública.
 
-**Versão de referência:** 4.0.0. **Licença:** GPL-2.0-or-later. **Manutenção:** [gamberine](https://github.com/gamberine).
+**Versão de referência:** 4.1.0. **Licença:** GPL-2.0-or-later. **Manutenção:** [gamberine](https://github.com/gamberine).
 
 ## Finalidade e limites
 
@@ -36,6 +36,8 @@ O pacote contém uma única pasta `gamb-wp-static-guard`. Não inclui banco de d
 
 ## Configuração operacional
 
+Na primeira publicação, o servidor exige **Site Completo (Full Site)** e libera os demais escopos somente após a entrega bem-sucedida.
+
 Para uma aplicação navegável, selecione **Site completo**. O modo **Somente recursos do tema** não produz páginas HTML. Atualizações individuais também reconstroem o site para manter listagens e pesquisa consistentes.
 
 A pasta local deve existir, permitir gravação e ser dedicada à publicação. A raiz do WordPress, seus ancestrais e seus diretórios internos são rejeitados. O manifesto de publicação permite remover somente arquivos gerados anteriormente pelo próprio plugin.
@@ -43,6 +45,10 @@ A pasta local deve existir, permitir gravação e ser dedicada à publicação. 
 O caminho público deve corresponder à localização da publicação: vazio para a raiz do domínio ou, por exemplo, `/portal` para uma subpasta. Alterações em menus, opções globais ou templates exigem nova publicação quando não houver um adaptador específico de agendamento.
 
 A remoção de CSS nativo e de classes do corpo permanece desabilitada por padrão. Esses controles devem ser habilitados somente depois de verificar que o tema não depende deles. A minificação adicional também permanece desabilitada por padrão.
+
+O painel apresenta caixas recolhíveis separadas para **STATIC/Conversão - HTML/ZIP** e **GUARD/Segurança - Blindado**. O escopo e o botão **Converter & Publicar Agora** permanecem em uma caixa independente.
+
+O gerenciador mantém somente as **seis cópias de segurança mais recentes**, somando todos os tipos. A retenção ocorre após a conclusão de uma nova cópia, sem remover arquivos de terceiros.
 
 ## Identificadores públicos
 

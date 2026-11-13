@@ -7,7 +7,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 /**
- * Gamb WP Static Guard - Gerenciador Central de Opções e Perfil Padrão Seguro (v4.0.0).
+ * Gamb WP Static Guard - Gerenciador Central de Opções e Perfil Padrão Seguro (v4.1.0).
  *
  * Mantém compatibilidade com a chave 'gamb-wp-static-guard' no wp_options e separa claramente
  * as configurações de 1. STATIC (Conversão & Publicação) e 2. GUARD (Ocultação & Segurança).
@@ -16,7 +16,7 @@ class Options {
 
 	const OPTION_KEY  = 'gamb_wp_static_guard';
 	const VERSION_KEY = 'gamb_wp_static_guard_profile_version';
-	const VERSION     = '4.0.0';
+	const VERSION     = '4.1.0';
 
 	private static $instance = null;
 	private $options = array();
@@ -53,14 +53,14 @@ class Options {
 			// =====================================================================
 			// 1. STATIC - CONVERSÃO, ESCOPO, IMPLANTAÇÃO, AUTOMAÇÃO E PERFORMANCE
 			// =====================================================================
-			'generate_type'                    => 'export', // Prioridade padrão: Somente o Tema (Theme Only)
+			'generate_type'                    => 'export', // Primeira publicação sempre completa.
 			'destination_url_type'             => 'relative', // relative | absolute | offline
 			'destination_scheme'               => 'https://',
 			'destination_host'                 => '',
 			'relative_path'                    => '',
 			'force_replace_url'                => true,
 			'clear_directory_before_export'    => true,
-			'delivery_method'                  => 'zip', // zip | local | github | aws-s3 | ftp | sftp
+			'delivery_method'                  => 'zip', // zip | local
 			'local_dir'                        => '',
 			'smart_crawl'                      => true,
 			'crawlers'                         => array(
@@ -179,6 +179,7 @@ class Options {
 			'archive_status_messages'          => array(),
 			'last_export_zip_url'              => '',
 			'last_export_zip_file'             => '',
+			'first_full_export_completed'      => false,
 			'last_export_time'                 => '',
 			'last_export_scope'                => '',
 			'last_export_files_count'          => 0,

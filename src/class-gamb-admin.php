@@ -65,7 +65,7 @@ class Admin_Controller {
         }
         if ( isset( $params['delivery_method'] ) && ! in_array( $params['delivery_method'], array( 'local', 'zip' ), true ) ) { return new \WP_Error( 'invalid_delivery', 'Selecione entrega local ou arquivo ZIP.', array( 'status' => 400 ) ); }
         foreach ( $params as $key => $value ) {
-            if ( ! array_key_exists( $key, $defaults ) || strpos( $key, 'last_' ) === 0 || in_array( $key, array( 'archive_status_messages', 'version' ), true ) ) { continue; }
+            if ( ! array_key_exists( $key, $defaults ) || strpos( $key, 'last_' ) === 0 || in_array( $key, array( 'archive_status_messages', 'version', 'first_full_export_completed' ), true ) ) { continue; }
             if ( is_bool( $defaults[$key] ) ) { $value = filter_var( $value, FILTER_VALIDATE_BOOLEAN ); }
             elseif ( is_int( $defaults[$key] ) ) { $value = max( 0, (int) $value ); }
             elseif ( is_array( $defaults[$key] ) ) { $value = is_array( $value ) ? array_map( 'sanitize_text_field', $value ) : array(); }
@@ -90,15 +90,27 @@ class Admin_Controller {
         <div class="wrap gamb-admin" id="gamb-guard-admin-app">
             <header class="gamb-admin-header"><img src="<?php echo esc_url( GAMB_STATIC_WP_URL . '/assets/gamb-wp-static-guard-logo.svg' ); ?>" alt="Gamb WP Static Guard" width="240"><p>Versão <?php echo esc_html( GAMB_STATIC_WP_VERSION ); ?> - Administração de publicação estática e controles de exposição.</p></header>
             <div id="gamb-toast" role="status" aria-live="polite" hidden></div>
-            <nav class="gamb-admin-nav" aria-label="Seções de configuração">
-                <?php foreach ( array( 'publication' => 'Publicação', 'settings' => 'Configuração', 'guard' => 'Controles de exposição', 'backup' => 'Cópias de segurança' ) as $id => $label ) : ?><button type="button" class="button" data-tab="<?php echo esc_attr( $id ); ?>" aria-controls="panel-<?php echo esc_attr( $id ); ?>" aria-pressed="<?php echo 'publication' === $id ? 'true' : 'false'; ?>"><?php echo esc_html( $label ); ?></button><?php endforeach; ?>
-            </nav>
+            <div class="gamb-layout">
+            <aside class="gamb-sidebar" aria-label="Publicação e segurança">
+                <details class="gamb-sidebox" name="gamb-sections" open><summary>1. STATIC/Conversão - HTML/ZIP</summary><nav class="gamb-admin-nav" aria-label="Conversão estática"><button type="button" class="button" data-tab="publication" aria-controls="panel-publication" aria-pressed="true">Publicação e registro</button><button type="button" class="button" data-tab="settings" aria-controls="panel-settings" aria-pressed="false">Configuração da conversão</button></nav></details>
+                <details class="gamb-sidebox" name="gamb-sections"><summary>2. GUARD/Segurança - Blindado</summary><nav class="gamb-admin-nav" aria-label="Controles de segurança"><button type="button" class="button" data-tab="guard" aria-controls="panel-guard" aria-pressed="false">Controles de exposição</button><button type="button" class="button" data-tab="backup" aria-controls="panel-backup" aria-pressed="false">Gerenciador de backups</button></nav></details>
+                <section class="gamb-sidebox gamb-scope-box" aria-labelledby="gamb-scope-heading">
+                    <h2 id="gamb-scope-heading">Selecione o Escopo de Conversão</h2>
+                    <label class="screen-reader-text" for="gamb-quick-scope">Escopo de conversão</label>
+                    <select id="gamb-quick-scope" aria-describedby="gamb-scope-help">
+                        <option value="theme" <?php disabled( ! $options['first_full_export_completed'] ); ?> <?php selected( $options['first_full_export_completed'] && 'theme' === $options['generate_type'] ); ?>>Somente arquivos do tema (sem páginas/html)</option>
+                        <option value="update" <?php disabled( ! $options['first_full_export_completed'] ); ?> <?php selected( $options['first_full_export_completed'] && 'update' === $options['generate_type'] ); ?>>Atualizar site (reconstrução completa)</option>
+                        <option value="export" <?php selected( ! $options['first_full_export_completed'] || ! in_array( $options['generate_type'], array( 'theme', 'update' ), true ) ); ?>>Site Completo (Full Site)</option>
+                    </select>
+                    <p id="gamb-scope-help">Somente os arquivos do tema não geram páginas HTML e não são suficientes para publicar um site navegável. Atualizar site reconstrói a publicação completa.</p>
+                    <p data-first-full-notice <?php if ( $options['first_full_export_completed'] ) : ?>hidden<?php endif; ?>><strong>A primeira publicação deve ser Site Completo. As outras opções serão liberadas após a conclusão.</strong></p>
+                    <button type="button" class="button button-primary gamb-run-export-btn">Converter &amp; Publicar Agora</button>
+                </section>
+            </aside>
+            <div class="gamb-content">
             <section class="gamb-panel" id="panel-publication" aria-labelledby="gamb-publication-heading">
                 <h1 id="gamb-publication-heading">Publicação estática</h1>
                 <p>A publicação consulta páginas públicas e grava os arquivos no destino configurado. Conteúdos privados, rascunhos e páginas com senha não integram a exportação.</p>
-                <label for="gamb-quick-scope">Escopo da publicação</label>
-                <select id="gamb-quick-scope"><option value="export">Site completo</option><option value="update">Atualizar site completo</option><option value="theme">Somente recursos do tema, sem páginas HTML</option></select>
-                <button type="button" class="button button-primary gamb-run-export-btn">Converter e publicar</button>
                 <dl class="gamb-stats"><div><dt>Última publicação</dt><dd id="stat-last-time"><?php echo esc_html( $options['last_export_time'] ?: 'Não registrada' ); ?></dd></div><div><dt>Escopo</dt><dd id="stat-last-scope"><?php echo esc_html( $options['last_export_scope'] ?: 'Não registrado' ); ?></dd></div><div><dt>Arquivos processados</dt><dd id="stat-last-count"><?php echo (int) $options['last_export_files_count']; ?></dd></div></dl>
                 <div id="gamb-latest-zip-wrap"></div><h2>Registro de atividades</h2><div id="gamb-activity-log-box"><?php foreach ( (array) $options['archive_status_messages'] as $entry ) : ?><p><?php echo esc_html( ( $entry['datetime'] ?? '' ) . ' - ' . ( $entry['message'] ?? '' ) ); ?></p><?php endforeach; ?></div>
             </section>
@@ -117,7 +129,8 @@ class Admin_Controller {
                 <?php foreach ( array( 'guard_active_on_live_site' => 'Aplicar tratamento também nas páginas públicas da origem', 'guard_universal_token_cloaking' => 'Reescrever recursos para endereços opacos', 'guard_strip_asset_versions' => 'Remover parâmetros de versão dos recursos públicos', 'guard_disable_speculation' => 'Desabilitar regras de pré-carregamento especulativo', 'guard_strict_static_html' => 'Interromper entrega com referências internas não resolvidas', 'guard_clean_body_classes' => 'Remover classes nativas do corpo, após validar a dependência do tema', 'guard_remove_block_styles' => 'Remover estilos nativos de blocos, somente se o tema não os utilizar', 'guard_disable_texturize' => 'Desabilitar substituições tipográficas automáticas', 'hide_comments' => 'Remover comentários HTML na saída pública', 'guard_security_headers' => 'Aplicar cabeçalhos de segurança', 'guard_restrict_rest_api' => 'Restringir consulta anônima aos recursos administrativos da API' ) as $key => $label ) { $this->checkbox( $key, $label, $options ); } ?>
                 <button type="button" class="button button-primary gamb-save-settings-btn">Salvar configurações</button>
             </section>
-            <section class="gamb-panel" id="panel-backup" hidden><h2>Cópias de segurança</h2><p>O pacote de banco, tema e extensões não inclui uploads nem todos os arquivos da instalação. A restauração é manual e deve ser ensaiada em ambiente separado.</p><button type="button" class="button gamb-create-backup-btn" data-backup-type="db">Gerar cópia do banco</button> <button type="button" class="button gamb-create-backup-btn" data-backup-type="full">Gerar banco, tema e extensões</button><p>O acesso aos pacotes exige permissão administrativa.</p></section>
+            <section class="gamb-panel" id="panel-backup" hidden><h2>Gerenciador de backups</h2><p>São mantidas somente as seis cópias de segurança mais recentes, considerando todos os tipos. A retenção é aplicada após a conclusão de uma nova cópia.</p><p>O pacote de banco, tema e extensões não inclui uploads nem a instalação completa. A restauração é manual.</p><button type="button" class="button gamb-create-backup-btn" data-backup-type="db">Gerar cópia do banco</button> <button type="button" class="button gamb-create-backup-btn" data-backup-type="full">Gerar banco, tema e extensões</button><div class="gamb-backup-list" data-backup-list></div></section>
+            </div></div>
         </div>
         <?php
     }

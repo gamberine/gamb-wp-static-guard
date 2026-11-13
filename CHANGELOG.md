@@ -2,6 +2,15 @@
 
 Este documento distingue a incorporação histórica das novas alterações. As datas correspondem ao registro verificável, sem reconstruir datas de commits inexistentes.
 
+## 4.1.0 - 2026-11-13
+
+- Barra lateral com duas caixas recolhíveis separadas: STATIC/Conversão - HTML/ZIP e GUARD/Segurança - Blindado.
+- Caixa de escopo independente, seletor com seta, nomenclatura solicitada, explicações e comando Converter & Publicar Agora.
+- Primeira publicação obrigatoriamente completa, validada também no servidor; liberação dos demais escopos após entrega bem-sucedida.
+- Gerenciador de backups com listagem, download, exclusão autorizada e retenção das seis cópias mais recentes.
+- Exclusão restrita aos arquivos reconhecidos dentro da pasta de backup, sem seguir links simbólicos.
+- Regressões adicionais para escopo inicial e retenção.
+
 ## 4.0.0 - 2026-11-13
 
 ### Alterações de compatibilidade

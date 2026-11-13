@@ -1,5 +1,17 @@
 .gamb-admin { max-width: 1160px; color: #172b40; }
 .gamb-admin [hidden] { display: none !important; }
+.gamb-layout { display: grid; grid-template-columns: minmax(280px, 350px) minmax(0, 1fr); gap: 22px; align-items: start; }
+.gamb-sidebar { position: sticky; top: 48px; margin-top: 16px; }
+.gamb-content { min-width: 0; }
+.gamb-sidebox { padding: 18px; margin: 0 0 16px; background: #fff; border: 1px solid #c5cdd5; border-radius: 6px; }
+.gamb-sidebox summary { cursor: pointer; font-weight: 700; line-height: 1.7; min-height: 30px; }
+.gamb-sidebox .gamb-admin-nav { margin-top: 16px; display: grid; }
+.gamb-scope-box h2 { margin: 0 0 16px; font-size: 15px; line-height: 1.6; }
+.gamb-scope-box select { box-sizing: border-box; width: 100%; max-width: 100%; min-height: 42px; padding-right: 26px; font-size: 12px; appearance: none; background-color: #fff; background-repeat: no-repeat; background-position: right 8px center; background-size: 12px; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8'%3E%3Cpath fill='none' stroke='%23172b40' stroke-width='2' d='m1 1 5 5 5-5'/%3E%3C/svg%3E"); }
+.gamb-scope-box .gamb-run-export-btn { width: 100%; min-height: 42px; white-space: normal; }
+.gamb-backup-list { margin-top: 24px; overflow-x: auto; }
+.gamb-backup-list table { width: 100%; border-collapse: collapse; }
+.gamb-backup-list th, .gamb-backup-list td { padding: 12px 8px; border-bottom: 1px solid #d9dfe5; text-align: left; overflow-wrap: anywhere; }
 .gamb-admin-header, .gamb-panel { padding: 24px; margin: 16px 0; background: #fff; border: 1px solid #c5cdd5; border-radius: 6px; }
 .gamb-admin-header img { max-width: 100%; height: auto; }
 .gamb-admin h1 { margin: 0 0 20px; line-height: 1.4; }
@@ -18,4 +30,5 @@
 #gamb-toast.gamb-error { background: #fff0ef; border-color: #b42318; color: #7d2019; }
 #gamb-activity-log-box { max-height: 440px; overflow: auto; }
 .gamb-admin :is(button, input, select, a):focus-visible { outline: 3px solid #1768ac; outline-offset: 3px; }
+@media (max-width: 1050px) { .gamb-layout { grid-template-columns: 1fr; } .gamb-sidebar { position: static; } }
 @media (max-width: 600px) { .gamb-admin-header, .gamb-panel { padding: 16px; } .gamb-admin select { max-width: 100%; } }

@@ -126,7 +126,7 @@ class Gamb_Security_Suite {
 
 	public static function is_public_asset( $relative ) {
 		$relative = str_replace( "\\", "/", (string) $relative );
-		if ( preg_match( '~(?:^|/)(?:\.[^/]*|gamb-static-guard-(?:backups|archive)|backups?(?:[-_][^/]*)?)(?:/|$)~i', $relative ) ) { return false; }
+		if ( preg_match( '~(?:^|/)(?:\.[^/]*|gamb-(?:backups|static-guard-(?:backups|archive))|backups?(?:[-_][^/]*)?)(?:/|$)~i', $relative ) ) { return false; }
 		if ( preg_match( '/\.(?:php[0-9]*|phtml|phar)(?:\.|$)/i', basename( $relative ) ) ) { return false; }
 		$extension = strtolower( pathinfo( $relative, PATHINFO_EXTENSION ) );
 		return in_array( $extension, array( 'css', 'js', 'mjs', 'json', 'jpg', 'jpeg', 'png', 'gif', 'webp', 'avif', 'svg', 'ico', 'woff2', 'woff', 'ttf', 'eot', 'otf', 'pdf', 'mp4', 'webm', 'doc', 'docx', 'xls', 'xlsx', 'zip' ), true );

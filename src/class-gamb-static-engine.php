@@ -80,6 +80,10 @@ class Static_Engine {
 		}
 	}
 
+	public function resolve_scope( $scope ) {
+		return ! Options::instance()->get( 'first_full_export_completed', false ) ? 'export' : $scope;
+	}
+
 	private function perform_export( $scope, $post_id ) {
 		$opts = Options::instance();
 		if ( "" === $scope ) {
@@ -97,6 +101,7 @@ class Static_Engine {
 			// Keep archives, related links and the search index synchronized after a single push.
 			$scope = 'export';
 		}
+		$scope = $this->resolve_scope( $scope );
 		if ( 'update' === $scope ) { $scope = 'export'; }
 		if ( 'local' === $opts->get( 'delivery_method' ) ) {
 			$destination = $this->validate_local_destination( $opts->get( 'local_dir', '' ) );
@@ -227,6 +232,7 @@ class Static_Engine {
 			return array( 'success' => false, 'message' => $deploy_result->get_error_message() );
 		}
 
+		if ( 'export' === $scope ) { $opts->set( 'first_full_export_completed', true ); }
 		$now_str = date_i18n( "d/m/Y H:i:s" );
 		$opts->set( "last_export_time", $now_str )
 			->set( "last_export_scope", $scope_label )
@@ -252,6 +258,7 @@ class Static_Engine {
 		$this->maybe_dispatch_webhook( $scope, $exported_cnt );
 
 		return array(
+			'first_full_export_completed' => (bool) $opts->get( 'first_full_export_completed', false ),
 			"success"         => true,
 			"scope"           => $scope,
 			"scope_label"     => $scope_label,

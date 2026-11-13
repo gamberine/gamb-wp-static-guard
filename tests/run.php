@@ -3,7 +3,7 @@
 $site = __DIR__ . '/runtime/site/';
 foreach ( array( '', 'wp-content/themes/example/', 'wp-content/uploads/', 'wp-content/plugins/', 'wp-includes/' ) as $part ) { if ( ! is_dir( $site . $part ) ) { mkdir( $site . $part, 0777, true ); } }
 file_put_contents( $site . 'wp-content/themes/example/style.css', 'body{color:#123456}' );
-define( 'ABSPATH', $site ); define( 'WP_CONTENT_DIR', $site . 'wp-content' ); define( 'WP_PLUGIN_DIR', WP_CONTENT_DIR . '/plugins' ); define( 'WPINC', 'wp-includes' ); define( 'AUTH_KEY', 'automated-fixture-not-a-production-secret' ); define( 'GAMB_STATIC_WP_VERSION', '4.0.0' );
+define( 'ABSPATH', $site ); define( 'WP_CONTENT_DIR', $site . 'wp-content' ); define( 'WP_PLUGIN_DIR', WP_CONTENT_DIR . '/plugins' ); define( 'WPINC', 'wp-includes' ); define( 'AUTH_KEY', 'automated-fixture-not-a-production-secret' ); define( 'GAMB_STATIC_WP_VERSION', '4.1.0' );
 $legacy_key = base64_decode( 'c2ltcGx5LXN0YXRpYw==' );
 $legacy = array( 'use_minify' => false, 'relative_path' => '0', 'local_dir' => '/dedicated/output', 'ss_single_auto_export' => false, 'ss_single_auto_export_delay' => 0 );
 $GLOBALS['fixture_options'] = array( $legacy_key => $legacy );
@@ -28,6 +28,14 @@ require dirname( __DIR__ ) . '/src/class-gamb-options.php';
 require dirname( __DIR__ ) . '/src/class-gamb-guard-suite.php';
 require dirname( __DIR__ ) . '/src/class-gamb-frontend-policy.php';
 require dirname( __DIR__ ) . '/src/class-gamb-static-engine.php';
+require dirname( __DIR__ ) . '/src/class-gamb-backup-service.php';
+function date_i18n( $format, $timestamp = null ) { return date( $format, $timestamp ?? time() ); }
+function size_format( $size ) { return $size . ' B'; }
+function admin_url( $path ) { return 'https://example.test/wp-admin/' . $path; }
+function wp_create_nonce( $action ) { return 'test-nonce'; }
+function wp_json_encode( $value ) { return json_encode( $value ); }
+class WP_Error {}
+function is_wp_error( $value ) { return $value instanceof WP_Error; }
 $checks = 0;
 function expect( $condition, $name ) { global $checks; if ( ! $condition ) { throw new RuntimeException( $name ); } $checks++; }
 $options = \GambWPStaticGuard\Options::instance();
@@ -64,4 +72,18 @@ expect( ! \GambWPStaticGuard\Gamb_Security_Suite::is_public_asset( 'handler.php'
 expect( ! \GambWPStaticGuard\Gamb_Security_Suite::is_public_asset( 'database.sql' ), 'Rejeitar dump SQL.' );
 expect( ! \GambWPStaticGuard\Gamb_Security_Suite::is_public_asset( 'gamb-static-guard-backups/package.zip' ), 'Rejeitar diretório de backup.' );
 expect( ! \GambWPStaticGuard\Gamb_Security_Suite::is_public_asset( '.private/config.json' ), 'Rejeitar arquivos ocultos.' );
+expect( ! \GambWPStaticGuard\Gamb_Security_Suite::is_public_asset( 'gamb-backups/package.zip' ), 'Rejeitar cópias administrativas.' );
+expect( ! \GambWPStaticGuard\Gamb_Security_Suite::is_public_asset( 'handler.php.jpg' ), 'Rejeitar dupla extensão de servidor.' );
+$options->set( 'first_full_export_completed', false );
+expect( $engine->resolve_scope( 'theme' ) === 'export' && $engine->resolve_scope( 'update' ) === 'export', 'Exigir primeira conversão completa no servidor.' );
+$options->set( 'first_full_export_completed', true );
+expect( $engine->resolve_scope( 'theme' ) === 'theme', 'Liberar escopos após publicação completa.' );
+$backup_dir = \GambWPStaticGuard\Backup_Service::get_backup_dir();
+for ( $i = 1; $i <= 8; $i++ ) { $path = $backup_dir . '/gamb-db-backup-fixture-' . $i . '.sql'; file_put_contents( $path, '-- fixture' ); touch( $path, 1000000000 + $i ); }
+file_put_contents( $backup_dir . '/unrelated.txt', 'preserve' );
+expect( \GambWPStaticGuard\Backup_Service::enforce_retention() === true, 'Aplicar retenção.' );
+$backups = \GambWPStaticGuard\Backup_Service::list_backups();
+expect( count( $backups ) === 6 && $backups[0]['filename'] === 'gamb-db-backup-fixture-8.sql' && $backups[5]['filename'] === 'gamb-db-backup-fixture-3.sql', 'Preservar somente as seis cópias mais recentes.' );
+expect( is_file( $backup_dir . '/unrelated.txt' ), 'Preservar arquivos não administrados pelo plugin.' );
+expect( ! \GambWPStaticGuard\Backup_Service::delete_backup( '../unrelated.txt' ), 'Bloquear exclusão fora do escopo.' );
 echo $checks . " verificações independentes concluídas.\n";

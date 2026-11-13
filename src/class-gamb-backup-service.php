@@ -12,6 +12,7 @@ if ( ! defined( "ABSPATH" ) ) {
 class Backup_Service {
 
 	const BACKUP_DIR_NAME = "gamb-backups";
+	const RETENTION_LIMIT = 6;
 
 	public static function get_backup_dir() {
 		$uploads = wp_upload_dir();
@@ -130,6 +131,35 @@ class Backup_Service {
 	}
 
 	public static function create_backup( $type = "full" ) {
+		$lock = @fopen( get_temp_dir() . 'gamb-backup-' . md5( ABSPATH ) . '.lock', 'c' );
+		if ( ! $lock || ! flock( $lock, LOCK_EX | LOCK_NB ) ) { if ( $lock ) { fclose( $lock ); } return new \WP_Error( 'backup_busy', 'Outra cópia de segurança está em andamento.' ); }
+		try {
+			if ( 'full' === $type && ! class_exists( '\\ZipArchive' ) ) { return new \WP_Error( 'zip_required', 'O pacote de banco, tema e extensões requer a extensão ZIP.' ); }
+			$result = self::perform_backup( $type );
+			if ( is_wp_error( $result ) ) { return $result; }
+			$path = trailingslashit( self::get_backup_dir() ) . $result['filename'];
+			if ( ! is_file( $path ) || ! filesize( $path ) ) { return new \WP_Error( 'backup_empty', 'A cópia não foi concluída. As cópias anteriores foram preservadas.' ); }
+			$history_file = trailingslashit( self::get_backup_dir() ) . '.gamb-backup-history.json';
+			$history = is_file( $history_file ) ? json_decode( file_get_contents( $history_file ), true ) : array();
+			$history = is_array( $history ) ? $history : array();
+			$history[$result['filename']] = microtime( true );
+			if ( false === file_put_contents( $history_file, wp_json_encode( $history ) ) ) { return new \WP_Error( 'backup_history', 'Não foi possível registrar a ordem das cópias de segurança.' ); }
+			$retention = self::enforce_retention();
+			if ( is_wp_error( $retention ) ) { return $retention; }
+			$result['retained_backups'] = count( self::list_backups() );
+			return $result;
+		} finally { flock( $lock, LOCK_UN ); fclose( $lock ); }
+	}
+
+	public static function enforce_retention() {
+		$backups = self::list_backups();
+		foreach ( array_slice( $backups, self::RETENTION_LIMIT ) as $backup ) {
+			if ( ! self::delete_backup( $backup['filename'] ) ) { return new \WP_Error( 'backup_retention', 'Não foi possível remover uma cópia antiga. Verifique a permissão do diretório de backups.' ); }
+		}
+		return true;
+	}
+
+	private static function perform_backup( $type = "full" ) {
 		$backup_dir = self::get_backup_dir();
 		$date_stamp = gmdate( "Y-m-d-His" );
 		$rand_token = substr( md5( uniqid( "gamb_backup_", true ) ), 0, 8 );
@@ -146,7 +176,7 @@ class Backup_Service {
 		if ( ! class_exists( "\\ZipArchive" ) ) {
 			$sql_name = $prefix . $date_stamp . "-" . $rand_token . ".sql";
 			$final_sql = trailingslashit( $backup_dir ) . $sql_name;
-			@rename( $sql_path, $final_sql );
+			if ( ! @rename( $sql_path, $final_sql ) ) { return new \WP_Error( "backup_move", "Não foi possível concluir a cópia SQL." ); }
 			return array(
 				"success"        => true,
 				"filename"       => $sql_name,
@@ -204,7 +234,7 @@ class Backup_Service {
 			self::add_directory_to_zip( $zip, $plugins_dir, "wp-content/plugins" );
 		}
 
-		$zip->close();
+		if ( ! $zip->close() ) { return new \WP_Error( "backup_zip", "Não foi possível concluir o pacote ZIP." ); }
 		@unlink( $sql_path );
 
 		$size = is_file( $zip_path ) ? (int) filesize( $zip_path ) : 0;
@@ -231,7 +261,7 @@ class Backup_Service {
 		);
 		$skip_dirs = array( ".git", "node_modules", "gamb-backups", "gamb-static-guard-archive" );
 		foreach ( $iterator as $path => $info ) {
-			if ( ! $info->isFile() ) {
+			if ( ! $info->isFile() || $info->isLink() ) {
 				continue;
 			}
 			$rel  = str_replace( "\\", "/", substr( $path, $base_len ) );
@@ -260,48 +290,44 @@ class Backup_Service {
 			return array();
 		}
 
+		$history_file = trailingslashit( $backup_dir ) . '.gamb-backup-history.json';
+		$history = is_file( $history_file ) ? json_decode( file_get_contents( $history_file ), true ) : array();
+		$history = is_array( $history ) ? $history : array();
 		$list = array();
 		foreach ( $files as $file ) {
 			$fname = basename( $file );
-			if ( ! preg_match( "/\\.(zip|sql)$/i", $fname ) ) {
+			if ( is_link( $file ) || ! preg_match( '/^gamb-(?:db|full)-backup-[A-Za-z0-9-]+\.(?:zip|sql)$/', $fname ) ) {
 				continue;
 			}
 			$size   = (int) filesize( $file );
-			$mtime  = (int) filemtime( $file );
+			$mtime  = $history[$fname] ?? (int) filemtime( $file );
 			$is_db  = strpos( $fname, "gamb-db-" ) === 0;
 			$list[] = array(
 				"filename"       => $fname,
 				"type_label"     => $is_db ? "Banco de Dados (SQL)" : "Completo (SQL + Arquivos)",
 				"size"           => $size,
 				"size_formatted" => size_format( $size ),
-				"created_at"     => date_i18n( "d/m/Y H:i:s", $mtime ),
+				"created_at"     => date_i18n( "d/m/Y H:i:s", (int) $mtime ),
 				"timestamp"      => $mtime,
 				"download_url"   => admin_url( "admin-post.php?action=gamb_download_backup&file=" . rawurlencode( $fname ) . "&_wpnonce=" . wp_create_nonce( "gamb_download_backup_" . $fname ) ),
 			);
 		}
 
 		usort( $list, function ( $a, $b ) {
-			return $b["timestamp"] - $a["timestamp"];
+			return ( $b["timestamp"] <=> $a["timestamp"] ) ?: strcmp( $b["filename"], $a["filename"] );
 		} );
 
 		return $list;
 	}
 
 	public static function delete_backup( $filename ) {
-		$filename   = sanitize_file_name( $filename );
-		$backup_dir = self::get_backup_dir();
-		$path       = trailingslashit( $backup_dir ) . $filename;
-		if ( is_file( $path ) && strpos( $filename, "gamb-" ) === 0 && preg_match( "/\\.(zip|sql)$/i", $filename ) ) {
-			return @unlink( $path );
-		}
-		return false;
+		if ( ! is_string( $filename ) || ! preg_match( '/^gamb-(?:db|full)-backup-[A-Za-z0-9-]+\.(?:zip|sql)$/', $filename ) ) { return false; }
+		$base = realpath( self::get_backup_dir() );
+		$path = $base ? $base . DIRECTORY_SEPARATOR . $filename : '';
+		$real = $path ? realpath( $path ) : false;
+		return $real && dirname( $real ) === $base && ! is_link( $path ) && is_file( $path ) ? unlink( $path ) : false;
 	}
 
-	/**
-	 * Executa verificação completa de diagnóstico de ambiente e segurança em Português.
-	 *
-	 * @return array<int,array<string,mixed>>
-	 */
 	public static function run_diagnostics() {
 		$opts        = Options::instance();
 		$backup_dir  = self::get_backup_dir();
