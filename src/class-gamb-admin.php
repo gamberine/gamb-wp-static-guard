@@ -150,6 +150,7 @@ class Admin_Controller {
 					headers: {'Content-Type': 'application/json', 'X-WP-Nonce': '<?php echo esc_js( $nonce ); ?>'},
 					body: JSON.stringify({post_id: b.getAttribute('data-post-id')})
 				}).then(function(r){ return r.json(); }).then(function(res){
+					if (!res || !res.success) throw new Error(res && res.message ? res.message : 'Falha ao exportar.');
 					b.disabled = false;
 					m.style.color = '#059669';
 					m.textContent = '✓ Página exportada com sucesso!';
@@ -367,8 +368,8 @@ class Admin_Controller {
 				<div class="gamb-quick-export-box">
 					<label for="gamb-quick-scope">Escopo de Conversão Estática</label>
 					<select id="gamb-quick-scope">
-						<option value="theme" <?php selected( $all["generate_type"], "theme" ); ?>>⚡ Somente o Tema (Prioridade)</option>
-						<option value="update" <?php selected( $all["generate_type"], "update" ); ?>>🔄 Apenas Alterações (Changes Only)</option>
+						<option value="theme" <?php selected( $all["generate_type"], "theme" ); ?>>⚡ Somente arquivos do tema (sem páginas)</option>
+						<option value="update" <?php selected( $all["generate_type"], "update" ); ?>>🔄 Atualizar site (reconstrução completa)</option>
 						<option value="export" <?php selected( $all["generate_type"], "export" ); ?>>🌐 Site Completo (Full Site)</option>
 					</select>
 					<button type="button" class="gamb-btn-primary gamb-run-export-btn">Converter &amp; Publicar Agora</button>
@@ -440,7 +441,7 @@ class Admin_Controller {
 							<h4>Dica de Uso — Qual modo de conversão escolher?</h4>
 							<p>
 								• <strong>Somente o Tema (Prioridade — Padrão)</strong>: converte, minifica e tokeniza exclusivamente os arquivos visuais do tema (<code>CSS</code>, <code>JS</code>, fontes e imagens de layout) em poucos segundos, sem precisar varrer milhares de posts ou fotos de produtos.<br/>
-								• <strong>Apenas Alterações (Changes Only)</strong>: atualiza rapidamente somente as páginas ou produtos modificados recentemente.<br/>
+								• <strong>Atualizar site (reconstrução completa)</strong>: atualiza rapidamente somente as páginas ou produtos modificados recentemente.<br/>
 								• <strong>Site Completo (Full Site)</strong>: gera todas as páginas, produtos, taxonomias, índice de busca <code>Fuse.js</code>, <code>404.html</code>, <code>.htaccess</code> e <code>_headers</code>.
 							</p>
 						</div>
@@ -455,7 +456,7 @@ class Admin_Controller {
 						<div class="gamb-status-grid">
 							<div class="gamb-stat-box">
 								<div class="gamb-stat-label">Escopo Prioritário Padrão</div>
-								<div class="gamb-stat-value" id="stat-last-scope"><?php echo esc_html( $all["last_export_scope"] ?: "Somente o Tema (Prioridade)" ); ?></div>
+								<div class="gamb-stat-value" id="stat-last-scope"><?php echo esc_html( $all["last_export_scope"] ?: "Somente arquivos do tema (sem páginas)" ); ?></div>
 							</div>
 							<div class="gamb-stat-box">
 								<div class="gamb-stat-label">Última Conversão Realizada</div>
@@ -521,11 +522,11 @@ class Admin_Controller {
 						<div class="gamb-field-row">
 							<label class="gamb-label" for="field-generate_type">Modo Padrão de Conversão Estática</label>
 							<select id="field-generate_type" class="gamb-select" data-opt="generate_type">
-								<option value="theme" <?php selected( $all["generate_type"], "theme" ); ?>>Somente o Tema (Theme Only — Prioridade Rápida: CSS, JS, Fontes e Imagens do Tema)</option>
-								<option value="update" <?php selected( $all["generate_type"], "update" ); ?>>Apenas Alterações (Changes Only — Páginas/Produtos modificados recentemente)</option>
+								<option value="theme" <?php selected( $all["generate_type"], "theme" ); ?>>Somente arquivos do tema (CSS, JS, fontes e imagens; sem páginas HTML)</option>
+								<option value="update" <?php selected( $all["generate_type"], "update" ); ?>>Atualizar site (reconstrução completa para sincronizar listagens e busca)</option>
 								<option value="export" <?php selected( $all["generate_type"], "export" ); ?>>Site Completo (Full Site — Todas as páginas, CPTs, taxonomias e uploads)</option>
 							</select>
-							<div class="gamb-field-help">Define se a exportação padrão deve converter apenas o tema (mais rápido) ou todo o site.</div>
+							<div class="gamb-field-help">Para publicar um site navegável, selecione Site Completo. Somente o Tema exporta recursos e não gera index.html. Atualizar e Single Push também reconstroem o site completo para sincronizar listagens e busca.</div>
 						</div>
 
 						<div class="gamb-field-row">
@@ -596,10 +597,10 @@ class Admin_Controller {
 							<select id="field-delivery_method" class="gamb-select" data-opt="delivery_method">
 								<option value="zip" <?php selected( $all["delivery_method"], "zip" ); ?>>Arquivo ZIP (Download direto pelo painel)</option>
 								<option value="local" <?php selected( $all["delivery_method"], "local" ); ?>>Diretório Local no Servidor</option>
-								<option value="github" <?php selected( $all["delivery_method"], "github" ); ?>>GitHub Pages / Repositório (API REST v3)</option>
-								<option value="aws-s3" <?php selected( $all["delivery_method"], "aws-s3" ); ?>>Amazon AWS S3 (Assinatura Nativa V4)</option>
-								<option value="ftp" <?php selected( $all["delivery_method"], "ftp" ); ?>>Servidor FTP</option>
-								<option value="sftp" <?php selected( $all["delivery_method"], "sftp" ); ?>>Servidor SFTP (SSH)</option>
+								<option disabled value="github" <?php selected( $all["delivery_method"], "github" ); ?>>GitHub (não implementado neste motor)</option>
+								<option disabled value="aws-s3" <?php selected( $all["delivery_method"], "aws-s3" ); ?>>AWS S3 (não implementado neste motor)</option>
+								<option disabled value="ftp" <?php selected( $all["delivery_method"], "ftp" ); ?>>FTP (não implementado neste motor)</option>
+								<option disabled value="sftp" <?php selected( $all["delivery_method"], "sftp" ); ?>>SFTP (não implementado neste motor)</option>
 							</select>
 						</div>
 

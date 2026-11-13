@@ -6,6 +6,15 @@
     var cfg = window.gambGuardData;
     var toast = document.getElementById('gamb-toast');
 
+    function parseResponse(response) {
+      return response.json().then(function (data) {
+        if (!response.ok || !data || data.success === false || data.code) {
+          throw new Error(data && data.message ? data.message : 'Não foi possível concluir a operação.');
+        }
+        return data;
+      });
+    }
+
     function showToast(msg, isError) {
       if (!toast) return;
       toast.textContent = msg;
@@ -68,16 +77,16 @@
           headers: { 'Content-Type': 'application/json', 'X-WP-Nonce': cfg.nonce },
           body: JSON.stringify(payload)
         })
-        .then(function(r) { return r.json(); })
+        .then(parseResponse)
         .then(function(res) {
           btn.disabled = false;
           btn.textContent = origText;
           showToast('Configurações salvas e cache atualizado com sucesso!');
         })
-        .catch(function() {
+        .catch(function(error) {
           btn.disabled = false;
           btn.textContent = origText;
-          showToast('Erro ao salvar configurações.', true);
+          showToast(error.message || 'Erro ao salvar configurações.', true);
         });
       });
     });
@@ -96,7 +105,7 @@
           headers: { 'Content-Type': 'application/json', 'X-WP-Nonce': cfg.nonce },
           body: JSON.stringify({ type: scopeVal })
         })
-        .then(function(r) { return r.json(); })
+        .then(parseResponse)
         .then(function(res) {
           exportBtns.forEach(function(b) { b.disabled = false; b.textContent = 'Converter & Publicar Agora'; });
           if (res && res.success) {
@@ -127,9 +136,9 @@
             showToast('Falha na exportação.', true);
           }
         })
-        .catch(function() {
+        .catch(function(error) {
           exportBtns.forEach(function(b) { b.disabled = false; b.textContent = 'Converter & Publicar Agora'; });
-          showToast('Erro de comunicação durante a exportação.', true);
+          showToast(error.message || 'Erro de comunicação durante a exportação.', true);
         });
       });
     });

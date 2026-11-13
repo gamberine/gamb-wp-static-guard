@@ -7,7 +7,7 @@ if ( ! defined( "ABSPATH" ) ) {
 /**
  * Plugin Name:       Gamb WP Static Guard
  * Description:       Plataforma integrada dividida em 1. STATIC (Conversão e Publicação Estática de Tema/Site, Auto Push e Busca Local Fuse.js) e 2. GUARD (Tokenização Criptográfica Universal /v/<token>, Ocultação de Stack, Blindagem HTTP/Cache/REST, Sanitização DOM/WCAG e Backup Estilo Duplicator).
- * Version:           3.0.0
+ * Version:           3.0.1
  * Requires at least: 6.2
  * Requires PHP:      7.4
  * Author:            Gamb
@@ -24,7 +24,7 @@ if ( ! defined( "GAMB_STATIC_WP_URL" ) ) {
 	define( "GAMB_STATIC_WP_URL", untrailingslashit( plugin_dir_url( __FILE__ ) ) );
 }
 if ( ! defined( "GAMB_STATIC_WP_VERSION" ) ) {
-	define( "GAMB_STATIC_WP_VERSION", "3.0.0" );
+	define( "GAMB_STATIC_WP_VERSION", "3.0.1" );
 }
 if ( ! defined( "SIMPLY_STATIC_PATH" ) ) {
 	define( "SIMPLY_STATIC_PATH", GAMB_STATIC_WP_PATH );

@@ -191,6 +191,10 @@ class Gamb_Security_Suite {
 	}
 
 	private function stream_static_asset( $info ) {
+		// An earlier BOM or plugin output must never prefix a binary image/font response.
+		while ( ob_get_level() > 0 ) {
+			if ( ! @ob_end_clean() ) { break; }
+		}
 		$file_path = $info["disk"];
 		$ext       = strtolower( pathinfo( $file_path, PATHINFO_EXTENSION ) );
 		if ( in_array( $ext, array( "php", "phtml", "phar", "inc", "sql", "env", "log", "ini", "sh" ), true ) ) {
@@ -225,7 +229,7 @@ class Gamb_Security_Suite {
 		if ( ! headers_sent() ) {
 			status_header( 200 );
 			header( "Content-Type: " . $content_type );
-			header( "Cache-Control: public, max-age=31536000, immutable" );
+			header( "Cache-Control: public, max-age=0, must-revalidate" );
 			header( "X-Content-Type-Options: nosniff" );
 			@header_remove( "X-Powered-By" );
 			@header_remove( "Server" );
@@ -254,7 +258,7 @@ class Gamb_Security_Suite {
 		}
 		if ( Options::instance()->get( "guard_hide_theme_identity", true ) ) {
 			$js = preg_replace( "#^\\s*(?:/\\*[\\s\\S]*?\\*/\\s*)+#", "", $js );
-			$js = preg_replace( "#//[#@][ \\t]*source(?:Mapping)?URL=[^\\r\\n]*#", "", $js );
+			$js = preg_replace( "~//[#@][ \\t]*source(?:Mapping)?URL=[^\\r\\n]*~", "", $js );
 		}
 		return $js;
 	}
@@ -272,6 +276,7 @@ class Gamb_Security_Suite {
 		}
 
 		$css = $this->rewrite_wp_paths_to_tokens( $css );
+		$this->register_tokens_in_content( $css );
 
 		$css_dir = dirname( str_replace( "\\", "/", $css_rel ) );
 		if ( "." === $css_dir ) {
@@ -302,7 +307,7 @@ class Gamb_Security_Suite {
 				}
 
 				$tok = $this->create_and_record_token( $kind, $norm_rel, $base_dir );
-				return "url(" . $quote . "/v/" . $tok . $quote . ")";
+				return "url(" . $quote . home_url( "/v/" . $tok ) . $quote . ")";
 			},
 			$css
 		);
@@ -349,7 +354,7 @@ class Gamb_Security_Suite {
 
 		// 3. Remove //# sourceURL=..., /* document.write */ e IDs de <link>/<script> que revelam o WordPress/tema
 		if ( $opts->get( "guard_hide_language_stack", true ) ) {
-			$html = preg_replace( "#//#[ \\t]*sourceURL=[^\\s<\"\x27]+#", "", $html );
+			$html = preg_replace( "#//\#[ \\t]*sourceURL=[^\\s<\"\x27]+#", "", $html );
 			$html = str_replace( array( "/* document.write */ ", "/* document.write */" ), "", $html );
 			$html = preg_replace( "#(<link\\b[^>]*?)\\s+id=[\x27\"][^\x27\"]+-css[\x27\"]#i", "$1", $html );
 			$html = preg_replace( "#(<script\\b[^>]*?)\\s+id=[\x27\"][^\x27\"]+-js(?:-(?:after|before|extra))?[\x27\"]#i", "$1", $html );
@@ -564,14 +569,15 @@ class Gamb_Security_Suite {
 		$inc_basedir     = ABSPATH . ( defined( "WPINC" ) ? WPINC : "wp-includes" );
 		$plugin_basedir  = defined( "WP_PLUGIN_DIR" ) ? WP_PLUGIN_DIR : ( WP_CONTENT_DIR . "/plugins" );
 
-		$origin_prefix = "" !== $host ? "(?:(?:https?:)?//" . preg_quote( $host, "#" ) . ")?" : "";
+		$origin = untrailingslashit( home_url() );
+		$origin_prefix = "(?:" . preg_quote( $origin, "#" ) . "|" . preg_quote( (string) parse_url( $origin, PHP_URL_PATH ), "#" ) . ")?";
 
 		if ( "" !== $stylesheet_slug ) {
 			$text = preg_replace_callback(
 				"#" . $origin_prefix . "/wp-content/themes/" . preg_quote( $stylesheet_slug, "#" ) . "/([^\"\x27\\s<>()\\\\]+)#i",
 				function ( $m ) use ( $theme_basedir ) {
 					$tok = $this->create_and_record_token( "t", $m[1], $theme_basedir );
-					return "/v/" . $tok;
+					return home_url( "/v/" . $tok );
 				},
 				$text
 			);
@@ -582,7 +588,7 @@ class Gamb_Security_Suite {
 				"#" . $origin_prefix . "/wp-content/themes/" . preg_quote( $template_slug, "#" ) . "/([^\"\x27\\s<>()\\\\]+)#i",
 				function ( $m ) use ( $parent_basedir ) {
 					$tok = $this->create_and_record_token( "p", $m[1], $parent_basedir );
-					return "/v/" . $tok;
+					return home_url( "/v/" . $tok );
 				},
 				$text
 			);
@@ -593,7 +599,7 @@ class Gamb_Security_Suite {
 				"#" . $origin_prefix . "/wp-content/uploads/([^\"\x27\\s<>()\\\\]+)#i",
 				function ( $m ) use ( $uploads_basedir ) {
 					$tok = $this->create_and_record_token( "u", $m[1], $uploads_basedir );
-					return "/v/" . $tok;
+					return home_url( "/v/" . $tok );
 				},
 				$text
 			);
@@ -603,7 +609,7 @@ class Gamb_Security_Suite {
 			"#" . $origin_prefix . "/wp-includes/([^\"\x27\\s<>()\\\\]+)#i",
 			function ( $m ) use ( $inc_basedir ) {
 				$tok = $this->create_and_record_token( "c", $m[1], $inc_basedir );
-				return "/v/" . $tok;
+				return home_url( "/v/" . $tok );
 			},
 			$text
 		);
@@ -612,7 +618,7 @@ class Gamb_Security_Suite {
 			"#" . $origin_prefix . "/wp-content/plugins/([^\"\x27\\s<>()\\\\]+)#i",
 			function ( $m ) use ( $plugin_basedir ) {
 				$tok = $this->create_and_record_token( "x", $m[1], $plugin_basedir );
-				return "/v/" . $tok;
+				return home_url( "/v/" . $tok );
 			},
 			$text
 		);
@@ -628,6 +634,18 @@ class Gamb_Security_Suite {
 		);
 
 		return $text;
+	}
+
+	/** Re-register resources tokenized by the separate HTTP request serving a page. */
+	public function register_tokens_in_content( $content ) {
+		$content = str_replace( "\\/", "/", $content );
+		preg_match_all( '#/v/([A-Za-z0-9_-]+)(?:\.[a-z0-9]+)?#i', $content, $matches );
+		foreach ( array_unique( $matches[1] ) as $token ) {
+			$info = self::decrypt_token( $token );
+			if ( $info ) {
+				$this->create_and_record_token( $info['kind'], $info['rel'] );
+			}
+		}
 	}
 
 	public function materialize_cloaked_assets_in_archive( $archive_dir = null ) {
@@ -660,8 +678,9 @@ class Gamb_Security_Suite {
 				if ( "css" === $ext ) {
 					$raw_css     = (string) @file_get_contents( $src_path );
 					$cloaked_css = $this->cloak_css_content( $raw_css, $info["kind"], $info["rel"] );
-					@file_put_contents( $v_dir . "/" . $tok . ".css", $cloaked_css );
-					@file_put_contents( $v_dir . "/" . $tok, $cloaked_css );
+					$cloaked_css = Static_Engine::get_instance()->apply_url_replacement_mode( $cloaked_css, "v/" . $tok . ".css" );
+					Static_Engine::get_instance()->write_export_file( $v_dir . "/" . $tok . ".css", $cloaked_css );
+					Static_Engine::get_instance()->write_export_file( $v_dir . "/" . $tok, $cloaked_css );
 					$count++;
 					foreach ( $this->export_tokens as $new_tok => $new_info ) {
 						if ( ! isset( $processed[ $new_tok ] ) ) {
@@ -671,12 +690,13 @@ class Gamb_Security_Suite {
 				} elseif ( "js" === $ext || "mjs" === $ext ) {
 					$raw_js   = (string) @file_get_contents( $src_path );
 					$clean_js = $this->sanitize_js_content( $raw_js );
-					@file_put_contents( $v_dir . "/" . $tok . ".js", $clean_js );
-					@file_put_contents( $v_dir . "/" . $tok, $clean_js );
+					$clean_js = Static_Engine::get_instance()->apply_url_replacement_mode( $clean_js, "v/" . $tok . ".js" );
+					Static_Engine::get_instance()->write_export_file( $v_dir . "/" . $tok . ".js", $clean_js );
+					Static_Engine::get_instance()->write_export_file( $v_dir . "/" . $tok, $clean_js );
 					$count++;
 				} else {
-					@copy( $src_path, $v_dir . "/" . $tok . ( "" !== $ext ? "." . $ext : "" ) );
-					@copy( $src_path, $v_dir . "/" . $tok );
+					if ( ! @copy( $src_path, $v_dir . "/" . $tok . ( "" !== $ext ? "." . $ext : "" ) ) ) { throw new \RuntimeException( "Falha ao copiar recurso tokenizado." ); }
+					if ( ! @copy( $src_path, $v_dir . "/" . $tok ) ) { throw new \RuntimeException( "Falha ao copiar recurso tokenizado." ); }
 					$count++;
 				}
 			}
@@ -962,66 +982,27 @@ class Gamb_Security_Suite {
 	}
 
 	public static function get_htaccess_content() {
-		return "# ==============================================================================\n"
-			. "# GAMB WP STATIC GUARD v3.0.0 — BLINDAGEM ZERO-FINGERPRINT & RESOLUÇÃO DE TOKENS\n"
-			. "# ==============================================================================\n\n"
-			. "Options -Indexes -ExecCGI -Includes\n"
-			. "ServerSignature Off\n\n"
-			. "ErrorDocument 404 /404.html\n"
-			. "ErrorDocument 403 /404.html\n\n"
-			. "<IfModule mod_rewrite.c>\n"
-			. "    RewriteEngine On\n"
-			. "    RewriteCond %{REQUEST_METHOD} !^(GET|HEAD|OPTIONS)$ [NC]\n"
-			. "    RewriteRule .* - [F,L]\n"
-			. "    RewriteRule ^(wp-admin|wp-login\\.php|xmlrpc\\.php|wp-config\\.php|wp-cron\\.php|wp-json) - [F,L,NC]\n"
-			. "    RewriteCond %{QUERY_STRING} (?:^|&)author=\\d+ [NC]\n"
-			. "    RewriteRule .* - [F,L]\n\n"
-			. "    # Resolução interna de tokens sem extensão (/v/<token>) para o arquivo tipado correspondente\n"
-			. "    RewriteCond %{REQUEST_FILENAME}.css -f\n"
-			. "    RewriteRule ^v/([A-Za-z0-9_-]+)$ v/$1.css [L,T=text/css]\n"
-			. "    RewriteCond %{REQUEST_FILENAME}.js -f\n"
-			. "    RewriteRule ^v/([A-Za-z0-9_-]+)$ v/$1.js [L,T=application/javascript]\n"
-			. "    RewriteCond %{REQUEST_FILENAME}.woff2 -f\n"
-			. "    RewriteRule ^v/([A-Za-z0-9_-]+)$ v/$1.woff2 [L,T=font/woff2]\n"
-			. "    RewriteCond %{REQUEST_FILENAME}.woff -f\n"
-			. "    RewriteRule ^v/([A-Za-z0-9_-]+)$ v/$1.woff [L,T=font/woff]\n"
-			. "    RewriteCond %{REQUEST_FILENAME}.ttf -f\n"
-			. "    RewriteRule ^v/([A-Za-z0-9_-]+)$ v/$1.ttf [L,T=font/ttf]\n"
-			. "    RewriteCond %{REQUEST_FILENAME}.webp -f\n"
-			. "    RewriteRule ^v/([A-Za-z0-9_-]+)$ v/$1.webp [L,T=image/webp]\n"
-			. "    RewriteCond %{REQUEST_FILENAME}.jpg -f\n"
-			. "    RewriteRule ^v/([A-Za-z0-9_-]+)$ v/$1.jpg [L,T=image/jpeg]\n"
-			. "    RewriteCond %{REQUEST_FILENAME}.jpeg -f\n"
-			. "    RewriteRule ^v/([A-Za-z0-9_-]+)$ v/$1.jpeg [L,T=image/jpeg]\n"
-			. "    RewriteCond %{REQUEST_FILENAME}.png -f\n"
-			. "    RewriteRule ^v/([A-Za-z0-9_-]+)$ v/$1.png [L,T=image/png]\n"
-			. "    RewriteCond %{REQUEST_FILENAME}.svg -f\n"
-			. "    RewriteRule ^v/([A-Za-z0-9_-]+)$ v/$1.svg [L,T=image/svg+xml]\n"
-			. "    RewriteCond %{REQUEST_FILENAME}.gif -f\n"
-			. "    RewriteRule ^v/([A-Za-z0-9_-]+)$ v/$1.gif [L,T=image/gif]\n"
-			. "</IfModule>\n\n"
-			. "<FilesMatch \"\\.(php|php[0-9]|phtml|phar|pl|py|cgi|asp|aspx|jsp|sh|bash|exe|dll)$\">\n"
-			. "    <IfModule mod_authz_core.c>\n"
-			. "        Require all denied\n"
-			. "    </IfModule>\n"
-			. "    <IfModule !mod_authz_core.c>\n"
-			. "        Order allow,deny\n"
-			. "        Deny from all\n"
-			. "    </IfModule>\n"
-			. "</FilesMatch>\n\n"
-			. "<IfModule mod_headers.c>\n"
-			. "    Header unset X-Powered-By\n"
-			. "    Header unset Server\n"
-			. "    Header unset X-Pingback\n"
-			. "    Header unset Link\n"
-			. "    Header always set Strict-Transport-Security \"max-age=31536000; includeSubDomains; preload\" env=HTTPS\n"
-			. "    Header always set X-Content-Type-Options \"nosniff\"\n"
-			. "    Header always set X-Frame-Options \"SAMEORIGIN\"\n"
-			. "    Header always set Referrer-Policy \"strict-origin-when-cross-origin\"\n"
-			. "    Header always set Permissions-Policy \"accelerometer=(), camera=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=(), usb=()\"\n"
-			. "    Header always set Cross-Origin-Opener-Policy \"same-origin-allow-popups\"\n"
-			. "    Header always set Content-Security-Policy \"upgrade-insecure-requests; frame-ancestors \x27self\x27; object-src \x27none\x27; base-uri \x27self\x27;\"\n"
-			. "</IfModule>\n";
+		$base = rtrim( '/' . trim( (string) Options::instance()->get( 'relative_path', '' ), '/' ), '/' );
+		$rules = "Options -Indexes -ExecCGI -Includes\nServerSignature Off\nDirectoryIndex index.html\n";
+		$rules .= "ErrorDocument 404 " . $base . "/404.html\nErrorDocument 403 " . $base . "/404.html\n";
+		$rules .= "<IfModule mod_rewrite.c>\nRewriteEngine On\n";
+		$rules .= "RewriteRule ^404\\.html$ - [END]\n";
+		$rules .= "RewriteCond %{REQUEST_METHOD} !^(GET|HEAD|OPTIONS)$ [NC]\nRewriteRule ^ - [F,END]\n";
+		$rules .= "RewriteCond %{QUERY_STRING} (?:^|&)author=\\d+ [NC]\nRewriteRule ^ - [F,END]\n";
+		$rules .= "RewriteRule ^(?:wp-admin|wp-login\\.php|xmlrpc\\.php|wp-config\\.php|wp-cron\\.php|wp-json)(?:/|$) - [F,END,NC]\n";
+		foreach ( array( 'css', 'js', 'mjs', 'json', 'woff2', 'woff', 'ttf', 'otf', 'eot', 'webp', 'jpg', 'jpeg', 'png', 'svg', 'gif', 'avif', 'ico', 'pdf', 'mp4', 'webm', 'doc', 'docx', 'xls', 'xlsx', 'zip' ) as $ext ) {
+			$rules .= "RewriteCond %{REQUEST_FILENAME}." . $ext . " -f\nRewriteRule ^v/([A-Za-z0-9_-]+)$ v/$1." . $ext . " [END]\n";
+		}
+		// END prevents the parent WordPress front controller from handling missing static files.
+		$rules .= "RewriteCond %{REQUEST_FILENAME} !-f\nRewriteCond %{REQUEST_FILENAME} !-d\nRewriteRule ^ - [R=404,END]\n</IfModule>\n";
+		$rules .= "<FilesMatch \"\\.(?:php[0-9]?|phtml|phar|pl|py|cgi|asp|aspx|jsp|sh|bash|exe|dll)$\">\nRequire all denied\n</FilesMatch>\n";
+		$rules .= "<FilesMatch \"^\\.\">\nRequire all denied\n</FilesMatch>\n";
+		$rules .= "<IfModule mod_mime.c>\nAddType text/css .css\nAddType application/javascript .js .mjs\nAddType application/json .json\nAddType font/woff2 .woff2\nAddType image/avif .avif\n</IfModule>\n";
+		$rules .= "<IfModule mod_headers.c>\nHeader unset X-Powered-By\nHeader unset X-Pingback\nHeader unset Link\n";
+		$rules .= "Header unset Server\nHeader always set Strict-Transport-Security \"max-age=31536000\" env=HTTPS\nHeader always set Permissions-Policy \"camera=(), microphone=(), geolocation=()\"\nHeader always set Cross-Origin-Opener-Policy \"same-origin-allow-popups\"\n";
+		$rules .= "Header always set X-Content-Type-Options \"nosniff\"\nHeader always set X-Frame-Options \"SAMEORIGIN\"\nHeader always set Referrer-Policy \"strict-origin-when-cross-origin\"\n";
+		$rules .= "Header always set Content-Security-Policy \"frame-ancestors 'self'; object-src 'none'; base-uri 'self';\"\n</IfModule>\n";
+		return $rules;
 	}
 
 	public static function get_headers_file_content() {
@@ -1034,6 +1015,6 @@ class Gamb_Security_Suite {
 			. "  Strict-Transport-Security: max-age=31536000; includeSubDomains; preload\n"
 			. "  Content-Security-Policy: upgrade-insecure-requests; frame-ancestors \x27self\x27; object-src \x27none\x27; base-uri \x27self\x27;\n\n"
 			. "/v/*\n"
-			. "  Cache-Control: public, max-age=31536000, immutable\n";
+			. "  Cache-Control: public, max-age=0, must-revalidate\n";
 	}
 }
