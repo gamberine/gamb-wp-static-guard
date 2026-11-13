@@ -1,0 +1,41 @@
+{
+  "base": "3.0.0",
+  "correcoes": "3.0.1",
+  "alteracoes": [
+    {
+      "arquivo": "gamb-wp-static-guard.php",
+      "sha256_3_0_0": "07639e266fa7da120b704e121a6d13ba4dc2a9eafb0de255eed27530e448c699",
+      "sha256_3_0_1": "390edf8b4382ac12389d562f389c2df8f0cea762073bd5e3a7d7db0db0fcd1fb"
+    },
+    {
+      "arquivo": "readme.txt",
+      "sha256_3_0_0": "dc1fe088942ab545b56716e0b85de0f62d3b22c6f9bdd216762a18da452926cd",
+      "sha256_3_0_1": "0f0ab2c8ba33a07997ef877bbd0ab7a177c9f71eaf41e38ef55650289323e60c"
+    },
+    {
+      "arquivo": "assets/admin-ui.js",
+      "sha256_3_0_0": "280e0a76a6fc3df9130e7218f3428e66e0eaf24e0c17f0b7ee89093645793252",
+      "sha256_3_0_1": "1f5dbc3993350f5574d68a4eefb48452168a27a5cf4940eea13bfb7649e4474f"
+    },
+    {
+      "arquivo": "assets/static-search.js",
+      "sha256_3_0_0": null,
+      "sha256_3_0_1": "61ccce47374a1e5f89ff66b36f97ea46731f15d6eb77769ca81b808fbc00de7a"
+    },
+    {
+      "arquivo": "src/class-gamb-admin.php",
+      "sha256_3_0_0": "a145221ea2b22af2c3f92e142d64e253499f14daa4dab2903db018ac23bbb5e0",
+      "sha256_3_0_1": "2ddfefa5e6d2d4e80127c25fdf809eadad170cff0c18eae5c38669eaacc982a3"
+    },
+    {
+      "arquivo": "src/class-gamb-guard-suite.php",
+      "sha256_3_0_0": "ccb21a58632467308d4bbba3ec6cddd737b9af4992c909def51462d20b5a310d",
+      "sha256_3_0_1": "6ce88865999889dec87b3ef00dd56574cf38db59569d8a4ab903b9aed66a0b68"
+    },
+    {
+      "arquivo": "src/class-gamb-static-engine.php",
+      "sha256_3_0_0": "be5fcb065c21367d0dca868f2243a665a6e35d15d0a090fc1a1e8838195ba91f",
+      "sha256_3_0_1": "8fc38be496741857b829be705f89ba348aa1b22e9ede090eee795e13a481b435"
+    }
+  ]
+}

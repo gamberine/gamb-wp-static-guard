@@ -1,13 +1,13 @@
 <?php
 
-namespace Simply_Static;
+namespace GambWPStaticGuard;
 
 if ( ! defined( "ABSPATH" ) ) {
 	exit;
 }
 
 /**
- * Gamb WP Static Guard — Serviço de Backup Estilo Duplicator & Diagnóstico de Segurança.
+ * Gamb WP Static Guard - Serviço de Backup Estilo pacote de recuperação & Diagnóstico de Segurança.
  */
 class Backup_Service {
 
@@ -24,7 +24,7 @@ class Backup_Service {
 
 		$htaccess = trailingslashit( $dir ) . ".htaccess";
 		if ( ! is_file( $htaccess ) ) {
-			$ht_content = "# Gamb WP Static Guard — Proteção de Diretório de Backups\n"
+			$ht_content = "# Gamb WP Static Guard - Proteção de Diretório de Backups\n"
 				. "<IfModule mod_authz_core.c>\n"
 				. "    Require all denied\n"
 				. "</IfModule>\n"
@@ -55,7 +55,7 @@ class Backup_Service {
 		$db_version = method_exists( $wpdb, "db_version" ) ? $wpdb->db_version() : "desconhecida";
 
 		fwrite( $fh, "-- =====================================================================\n" );
-		fwrite( $fh, "-- Gamb WP Static Guard — Snapshot Completo do Banco de Dados\n" );
+		fwrite( $fh, "-- Gamb WP Static Guard - Snapshot Completo do Banco de Dados\n" );
 		fwrite( $fh, "-- Data: " . $timestamp . "\n" );
 		fwrite( $fh, "-- Versão do WordPress: " . get_bloginfo( "version" ) . "\n" );
 		fwrite( $fh, "-- Versão MySQL: " . $db_version . "\n" );
@@ -169,7 +169,7 @@ class Backup_Service {
 
 		$manifest = array(
 			"generator"      => "Gamb WP Static Guard",
-			"version"        => "3.0.0",
+			"version"        => GAMB_STATIC_WP_VERSION,
 			"backup_type"    => $type,
 			"created_at"     => current_time( "mysql" ),
 			"site_url"       => site_url(),
@@ -183,7 +183,7 @@ class Backup_Service {
 		);
 		$zip->addFromString( "manifest.json", wp_json_encode( $manifest, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE ) );
 
-		$readme = "# Gamb WP Static Guard — Pacote de Backup (Estilo Duplicator)\n\n"
+		$readme = "# Gamb WP Static Guard - Pacote de Backup (Estilo pacote de recuperação)\n\n"
 			. "Gerado em: " . current_time( "mysql" ) . "\n"
 			. "Tipo: " . ( "full" === $type ? "Completo (Banco de Dados SQL + Tema + Plugins)" : "Banco de Dados SQL + Manifesto" ) . "\n\n"
 			. "## Conteúdo:\n"
@@ -322,25 +322,25 @@ class Backup_Service {
 				"detail"   => class_exists( "\\ZipArchive" ) ? "Ativa para geração de pacotes estáticos e backups." : "Ausente (usando fallback SQL/PclZip).",
 			),
 			array(
-				"category" => "1. STATIC — Diretórios",
+				"category" => "1. STATIC - Diretórios",
 				"label"    => "Diretório de Exportação Estática Gravável",
 				"ok"       => is_dir( $archive_dir ) && is_writable( $archive_dir ),
 				"detail"   => $archive_dir,
 			),
 			array(
-				"category" => "2. GUARD — Segurança & Ocultação",
+				"category" => "2. GUARD - Segurança & Ocultação",
 				"label"    => "Tokenização Criptográfica Universal (/v/<token>)",
 				"ok"       => (bool) $opts->get( "guard_universal_token_cloaking", true ),
 				"detail"   => $opts->get( "guard_universal_token_cloaking", true ) ? "Ativa (ocultando caminhos de tema, imagens, plugins e wp-includes)." : "Desativada.",
 			),
 			array(
-				"category" => "2. GUARD — Segurança & Ocultação",
+				"category" => "2. GUARD - Segurança & Ocultação",
 				"label"    => "Bloqueio de XML-RPC & REST API Anônima",
 				"ok"       => (bool) $opts->get( "disable_xmlrpc", true ) && (bool) $opts->get( "guard_restrict_rest_api", true ),
 				"detail"   => "Protegendo endpoints /xmlrpc.php e /wp-json/wp/v2/* contra raspagem e força bruta.",
 			),
 			array(
-				"category" => "2. GUARD — Segurança & Ocultação",
+				"category" => "2. GUARD - Segurança & Ocultação",
 				"label"    => "MU-Plugin Origin Shield",
 				"ok"       => is_file( $mu_file ),
 				"detail"   => is_file( $mu_file ) ? "Instalado em wp-content/mu-plugins/gamb-static-origin-shield.php." : "Rodando via hook padrão do plugin.",

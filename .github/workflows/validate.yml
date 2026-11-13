@@ -1,0 +1,23 @@
+name: Verificação do plugin
+on: [push, pull_request, workflow_dispatch]
+permissions:
+  contents: read
+jobs:
+  php:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        php: ['7.4', '8.1', '8.3', '8.4']
+    container: php:${{ matrix.php }}-cli
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Validar sintaxe PHP
+        run: find src tests -name '*.php' -not -path '*/runtime/*' -print0 | xargs -0 -n1 php -l && php -l gamb-wp-static-guard.php
+      - name: Executar regressões independentes
+        run: php tests/run.php
+  distribution:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - run: python3 scripts/build.py
+      - run: git diff --check

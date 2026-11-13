@@ -1,0 +1,20 @@
+name: Relatar defeito
+description: Registrar comportamento reproduzível. Não inclua dados pessoais ou credenciais.
+body:
+  - type: textarea
+    id: environment
+    attributes:
+      label: Ambiente
+      description: Versões do plugin, WordPress, PHP e servidor.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reprodução e resultado esperado
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Evidências sanitizadas

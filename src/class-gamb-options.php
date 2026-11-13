@@ -1,22 +1,22 @@
 <?php
 
-namespace Simply_Static;
+namespace GambWPStaticGuard;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
 /**
- * Gamb WP Static Guard — Gerenciador Central de Opções e Perfil Padrão Seguro (v3.0.0).
+ * Gamb WP Static Guard - Gerenciador Central de Opções e Perfil Padrão Seguro (v4.0.0).
  *
- * Mantém compatibilidade com a chave 'simply-static' no wp_options e separa claramente
+ * Mantém compatibilidade com a chave 'gamb-wp-static-guard' no wp_options e separa claramente
  * as configurações de 1. STATIC (Conversão & Publicação) e 2. GUARD (Ocultação & Segurança).
  */
 class Options {
 
-	const OPTION_KEY  = 'simply-static';
+	const OPTION_KEY  = 'gamb_wp_static_guard';
 	const VERSION_KEY = 'gamb_wp_static_guard_profile_version';
-	const VERSION     = '3.0.0';
+	const VERSION     = '4.0.0';
 
 	private static $instance = null;
 	private $options = array();
@@ -34,6 +34,7 @@ class Options {
 	}
 
 	private function __construct() {
+		self::migrate_legacy_options();
 		$stored = get_option( self::OPTION_KEY, array() );
 		if ( ! is_array( $stored ) ) {
 			$stored = array();
@@ -47,12 +48,12 @@ class Options {
 	 * @return array<string,mixed>
 	 */
 	public static function get_default_options() {
-		$post_types_default = array( 'post', 'page', 'produtos', 'servicos', 'banner', 'diferenciais', 'conteudo' );
+		$post_types_default = array(); // Vazio seleciona os tipos públicos disponíveis na execução.
 		return array(
 			// =====================================================================
-			// 1. STATIC — CONVERSÃO, ESCOPO, IMPLANTAÇÃO, AUTOMAÇÃO E PERFORMANCE
+			// 1. STATIC - CONVERSÃO, ESCOPO, IMPLANTAÇÃO, AUTOMAÇÃO E PERFORMANCE
 			// =====================================================================
-			'generate_type'                    => 'theme', // Prioridade padrão: Somente o Tema (Theme Only)
+			'generate_type'                    => 'export', // Prioridade padrão: Somente o Tema (Theme Only)
 			'destination_url_type'             => 'relative', // relative | absolute | offline
 			'destination_scheme'               => 'https://',
 			'destination_host'                 => '',
@@ -99,68 +100,43 @@ class Options {
 				'/\.(sql|bak|old|orig|save|swp|log|env|git|svn|hg|sh|ini|phps|fla|psd)$/i',
 			) ),
 
-			// Destinos de Implantação (GitHub, AWS S3, FTP, SFTP)
-			'github_account_type'              => 'personal',
-			'github_user'                      => '',
-			'github_email'                     => '',
-			'github_personal_access_token'     => '',
-			'github_repository'                => '',
-			'github_branch'                    => 'main',
-			'github_folder_path'               => '',
-			'github_webhook_url'               => '',
-			'aws_region'                       => 'us-east-1',
-			'aws_access_key'                   => '',
-			'aws_access_secret'                => '',
-			'aws_bucket'                       => '',
-			'aws_subdirectory'                 => '',
-			'aws_webhook_url'                  => '',
-			'ftp_host'                         => '',
-			'ftp_port'                         => 21,
-			'ftp_user'                         => '',
-			'ftp_pass'                         => '',
-			'ftp_folder'                       => '',
-			'ftp_passive_mode'                 => true,
-			'sftp_host'                        => '',
-			'sftp_port'                        => 22,
-			'sftp_user'                        => '',
-			'sftp_pass'                        => '',
-			'sftp_folder'                      => '',
-
 			// Automação Pós-Implementação (Single Push, Auto Push, Changes Only, Webhooks)
-			'ss_use_single_exports'            => true,
-			'ss_single_auto_export'            => true,
-			'ss_single_auto_export_delay'      => 0,
-			'ss_single_include_archives'       => true,
-			'ss_single_include_pagination'     => true,
-			'ss_single_export_add_xml_sitemap' => true,
-			'ss_webhook_url'                   => '',
-			'ss_webhook_enabled_types'         => array( 'export', 'theme', 'update', 'single' ),
+			'single_enabled'            => true,
+			'auto_export'            => true,
+			'auto_export_delay'      => 0,
+			'include_archives'       => true,
+			'include_pagination'     => true,
+			'include_sitemap' => true,
+			'webhook_url'                   => '',
+			'webhook_export_types'         => array( 'export', 'theme', 'update', 'single' ),
 			'auto_backup_before_export'        => false,
 
-			// Performance & Busca Estática Local (Fuse.js)
-			'use_minify'                       => true,
+			// Performance & Busca Estática Local (busca local)
+			'use_minify'                       => false,
 			'minify_html'                      => true,
 			'minify_css'                       => true,
 			'minify_js'                        => true,
-			'minify_js_exclude'                => "jquery.min.js\njquery.js\ngtranslate",
+			'minify_js_exclude'                => "jquery.min.js\njquery.js",
 			'use_css_optimize'                 => true,
-			'css_optimize_defer_js'            => true,
-			'css_optimize_defer_js_excludes'   => "jquery.min.js\njquery.js\ngtranslate",
+			'css_optimize_defer_js'            => false,
+			'css_optimize_defer_js_excludes'   => "jquery.min.js\njquery.js",
 			'use_search'                       => true,
-			'search_type'                      => 'fuse',
+			'search_type'                      => 'local',
 			'search_index_title'               => 'title',
 			'search_index_content'             => 'main, article, .entry-content, body',
 			'search_index_excerpt'             => ".entry-summary, .entry-content, meta[name='description']",
 			'search_excludable'                => "/404\n/wp-admin\n/wp-login\n/author\n/perfil\n/teste-senha",
-			'fuse_selector'                    => ".search-form, .wp-block-search, form[role='search']",
-			'fuse_threshold'                   => 0.2,
-			'fuse_weight_title'                => 3,
-			'fuse_weight_excerpt'              => 2,
-			'fuse_weight_content'              => 1,
 
 			// =====================================================================
-			// 2. GUARD — OCULTAÇÃO, TOKENIZAÇÃO UNIVERSAL, BLINDAGEM E DOM
+			// 2. GUARD - OCULTAÇÃO, TOKENIZAÇÃO UNIVERSAL, BLINDAGEM E DOM
 			// =====================================================================
+
+			'guard_remove_block_styles' => false,
+			'guard_clean_body_classes' => false,
+			'guard_disable_texturize' => false,
+			'guard_strip_asset_versions' => true,
+			'guard_disable_speculation' => true,
+			'guard_strict_static_html' => true,
 			'guard_active_on_live_site'        => true, // Ativa ocultação dinâmica também no site WP ao vivo
 			'guard_universal_token_cloaking'   => true, // Criptografa CSS, JS, fontes e imagens em /v/<token> sem extensão
 			'guard_encrypt_image_paths'        => true, // Oculta caminho completo e nome original das imagens
@@ -187,7 +163,7 @@ class Options {
 			'disable_db_debug'                 => true,
 			'disable_wlw_manifest'             => true,
 			'guard_restrict_rest_api'          => true, // Bloqueia raspagem anônima de /wp-json/wp/v2/*
-			'guard_isolate_auth_cache'         => true, // DONOTCACHEPAGE + limpeza de logged-in/admin-bar e assinatura LiteSpeed
+			'guard_isolate_auth_cache'         => true, // DONOTCACHEPAGE + limpeza de logged-in/admin-bar e assinatura cache de páginas
 			'guard_security_headers'           => true, // HSTS, CSP, X-Frame-Options, X-Content-Type-Options, Referrer-Policy, Cookies
 			'guard_filter_test_posts'          => true, // Oculta posts com senha ou teste-senha da navegação pública
 
@@ -208,6 +184,35 @@ class Options {
 			'last_export_files_count'          => 0,
 			'version'                          => self::VERSION,
 		);
+	}
+
+	/** Identifica a opção anterior por impressão SHA-256; mantém a origem para recuperação. */
+	private static function migrate_legacy_options() {
+		if ( false !== get_option( self::OPTION_KEY, false ) ) { return; }
+		foreach ( wp_load_alloptions() as $key => $raw ) {
+			if ( hash( 'sha256', $key ) !== '314b56143ebd5052dc35ae543712cf6bbfeba9a411d2fae94904c1953774aea8' ) { continue; }
+			$legacy = maybe_unserialize( $raw );
+			if ( ! is_array( $legacy ) ) { return; }
+			$mapping = array(
+			'ss_use_single_exports' => 'single_enabled',
+			'ss_single_auto_export' => 'auto_export',
+			'ss_single_auto_export_delay' => 'auto_export_delay',
+			'ss_single_include_archives' => 'include_archives',
+			'ss_single_include_pagination' => 'include_pagination',
+			'ss_single_export_add_xml_sitemap' => 'include_sitemap',
+			'ss_webhook_url' => 'webhook_url',
+			'ss_webhook_enabled_types' => 'webhook_export_types'
+			);
+			foreach ( $mapping as $old => $new ) {
+				if ( array_key_exists( $old, $legacy ) ) { $legacy[$new] = $legacy[$old]; unset( $legacy[$old] ); }
+			}
+			$legacy = array_intersect_key( $legacy, self::get_default_options() );
+			$legacy['archive_status_messages'] = array();
+			$legacy['version'] = self::VERSION;
+			add_option( self::OPTION_KEY, $legacy, '', true );
+			add_option( 'gamb_wp_static_guard_migration_version', self::VERSION, '', false );
+			return;
+		}
 	}
 
 	public function get( $key, $default = null ) {

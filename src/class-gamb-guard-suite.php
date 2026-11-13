@@ -1,23 +1,24 @@
 <?php
 
-namespace Simply_Static;
+namespace GambWPStaticGuard;
 
 if ( ! defined( "ABSPATH" ) ) {
 	exit;
 }
 
 /**
- * Gamb WP Static Guard — 2. GUARD (Suíte de Ocultação, Tokenização Criptográfica, Blindagem e Sanitização DOM).
+ * Gamb WP Static Guard - 2. GUARD (Suíte de Ocultação, Tokenização Criptográfica, Blindagem e Sanitização DOM).
  */
 class Gamb_Security_Suite {
 
-	const PROFILE_VERSION = "3.0.0";
-	const OPTION_FLAG     = "gamb_auto_configured_version";
+	const PROFILE_VERSION = "4.0.0";
+	const OPTION_FLAG     = "gamb_wp_static_guard_profile_version";
 
 	private static $instance = null;
 
 	/** @var array<string,array{disk:string,ext:string,kind:string,rel:string}> Tokens registrados para materialização estática */
 	private $export_tokens = array();
+	private $export_directories = array();
 
 	public static function get_instance() {
 		if ( null === self::$instance ) {
@@ -98,7 +99,7 @@ class Gamb_Security_Suite {
 		if ( "d" === $kind && "" !== $subpath ) {
 			$rel_path = rtrim( $rel_path, "/\\" ) . "/" . ltrim( $subpath, "/\\" );
 		}
-		if ( "" === $rel_path || strpos( $rel_path, ".." ) !== false ) {
+		if ( "" === $rel_path || strpos( $rel_path, ".." ) !== false || ! self::is_public_asset( $rel_path ) ) {
 			return null;
 		}
 
@@ -121,6 +122,14 @@ class Gamb_Security_Suite {
 			"rel"  => $rel_path,
 			"disk" => $candidate,
 		);
+	}
+
+	public static function is_public_asset( $relative ) {
+		$relative = str_replace( "\\", "/", (string) $relative );
+		if ( preg_match( '~(?:^|/)(?:\.[^/]*|gamb-static-guard-(?:backups|archive)|backups?(?:[-_][^/]*)?)(?:/|$)~i', $relative ) ) { return false; }
+		if ( preg_match( '/\.(?:php[0-9]*|phtml|phar)(?:\.|$)/i', basename( $relative ) ) ) { return false; }
+		$extension = strtolower( pathinfo( $relative, PATHINFO_EXTENSION ) );
+		return in_array( $extension, array( 'css', 'js', 'mjs', 'json', 'jpg', 'jpeg', 'png', 'gif', 'webp', 'avif', 'svg', 'ico', 'woff2', 'woff', 'ttf', 'eot', 'otf', 'pdf', 'mp4', 'webm', 'doc', 'docx', 'xls', 'xlsx', 'zip' ), true );
 	}
 
 	public static function get_base_dir_for_kind( $kind ) {
@@ -307,7 +316,7 @@ class Gamb_Security_Suite {
 				}
 
 				$tok = $this->create_and_record_token( $kind, $norm_rel, $base_dir );
-				return "url(" . $quote . home_url( "/v/" . $tok ) . $quote . ")";
+				return "" !== $tok ? "url(" . $quote . home_url( "/v/" . $tok ) . $quote . ")" : $m[0];
 			},
 			$css
 		);
@@ -325,7 +334,7 @@ class Gamb_Security_Suite {
 				define( "DONOTCACHEPAGE", true );
 			}
 			if ( ! headers_sent() ) {
-				header( "X-LiteSpeed-Cache-Control: private, no-store" );
+				header( "X-cache de páginas-Cache-Control: private, no-store" );
 				header( "Cache-Control: private, no-store, no-cache, must-revalidate" );
 			}
 		}
@@ -347,7 +356,7 @@ class Gamb_Security_Suite {
 			$html
 		);
 
-		// 2. Remove comentários HTML (incluindo assinaturas LiteSpeed Cache)
+		// 2. Remove comentários HTML (incluindo assinaturas cache de páginas)
 		if ( $opts->get( "hide_comments", true ) ) {
 			$html = preg_replace( "#<!--(?!\\s*\\[if|SS_MIN_BLOCK_)[\\s\\S]*?-->#", "", $html );
 		}
@@ -539,12 +548,16 @@ class Gamb_Security_Suite {
 
 	private function create_and_record_token( $kind, $rel_path, $base_dir = null ) {
 		$clean_rel = ltrim( explode( "#", explode( "?", (string) $rel_path, 2 )[0], 2 )[0], "/\\" );
+		if ( ! self::is_public_asset( $clean_rel ) ) { return ''; }
 		$tok       = self::encrypt_token( $kind, $clean_rel );
 		if ( null === $base_dir ) {
 			$base_dir = self::get_base_dir_for_kind( $kind );
 		}
 		if ( $base_dir ) {
 			$disk = trailingslashit( $base_dir ) . $clean_rel;
+			$real_base = realpath( $base_dir );
+			$real_file = realpath( $disk );
+			if ( ! $real_base || ! $real_file || 0 !== strpos( wp_normalize_path( $real_file ), trailingslashit( wp_normalize_path( $real_base ) ) ) ) { return ''; }
 			if ( is_file( $disk ) ) {
 				$ext = strtolower( pathinfo( $disk, PATHINFO_EXTENSION ) );
 				$this->export_tokens[ $tok ] = array(
@@ -577,7 +590,7 @@ class Gamb_Security_Suite {
 				"#" . $origin_prefix . "/wp-content/themes/" . preg_quote( $stylesheet_slug, "#" ) . "/([^\"\x27\\s<>()\\\\]+)#i",
 				function ( $m ) use ( $theme_basedir ) {
 					$tok = $this->create_and_record_token( "t", $m[1], $theme_basedir );
-					return home_url( "/v/" . $tok );
+					return "" !== $tok ? home_url( "/v/" . $tok ) : $m[0];
 				},
 				$text
 			);
@@ -588,7 +601,7 @@ class Gamb_Security_Suite {
 				"#" . $origin_prefix . "/wp-content/themes/" . preg_quote( $template_slug, "#" ) . "/([^\"\x27\\s<>()\\\\]+)#i",
 				function ( $m ) use ( $parent_basedir ) {
 					$tok = $this->create_and_record_token( "p", $m[1], $parent_basedir );
-					return home_url( "/v/" . $tok );
+					return "" !== $tok ? home_url( "/v/" . $tok ) : $m[0];
 				},
 				$text
 			);
@@ -599,7 +612,7 @@ class Gamb_Security_Suite {
 				"#" . $origin_prefix . "/wp-content/uploads/([^\"\x27\\s<>()\\\\]+)#i",
 				function ( $m ) use ( $uploads_basedir ) {
 					$tok = $this->create_and_record_token( "u", $m[1], $uploads_basedir );
-					return home_url( "/v/" . $tok );
+					return "" !== $tok ? home_url( "/v/" . $tok ) : $m[0];
 				},
 				$text
 			);
@@ -609,7 +622,7 @@ class Gamb_Security_Suite {
 			"#" . $origin_prefix . "/wp-includes/([^\"\x27\\s<>()\\\\]+)#i",
 			function ( $m ) use ( $inc_basedir ) {
 				$tok = $this->create_and_record_token( "c", $m[1], $inc_basedir );
-				return home_url( "/v/" . $tok );
+				return "" !== $tok ? home_url( "/v/" . $tok ) : $m[0];
 			},
 			$text
 		);
@@ -618,7 +631,7 @@ class Gamb_Security_Suite {
 			"#" . $origin_prefix . "/wp-content/plugins/([^\"\x27\\s<>()\\\\]+)#i",
 			function ( $m ) use ( $plugin_basedir ) {
 				$tok = $this->create_and_record_token( "x", $m[1], $plugin_basedir );
-				return home_url( "/v/" . $tok );
+				return "" !== $tok ? home_url( "/v/" . $tok ) : $m[0];
 			},
 			$text
 		);
@@ -628,6 +641,11 @@ class Gamb_Security_Suite {
 			function ( $m ) {
 				$dir_rel = str_replace( "\\/", "/", $m[1] );
 				$tok     = self::encrypt_token( "d", $dir_rel );
+				$base = realpath( self::get_base_dir_for_kind( 'd' ) );
+				$directory = $base ? realpath( $base . '/' . $dir_rel ) : false;
+				if ( $directory && is_dir( $directory ) && 0 === strpos( wp_normalize_path( $directory ), trailingslashit( wp_normalize_path( $base ) ) ) ) {
+					$this->export_directories[$tok] = $directory;
+				}
 				return "\\/v\\/d\\/" . $tok . "\\/";
 			},
 			$text
@@ -671,7 +689,7 @@ class Gamb_Security_Suite {
 				}
 				$processed[ $tok ] = true;
 				$src_path = $info["disk"];
-				if ( ! is_file( $src_path ) ) {
+				if ( ! is_file( $src_path ) || ! self::is_public_asset( $info["rel"] ) ) {
 					continue;
 				}
 				$ext = $info["ext"];
@@ -703,10 +721,8 @@ class Gamb_Security_Suite {
 			$queue = $next_batch;
 		}
 
-		$plugin_dir = defined( "WP_PLUGIN_DIR" ) ? WP_PLUGIN_DIR : ( WP_CONTENT_DIR . "/plugins" );
-		if ( is_dir( $plugin_dir . "/gtranslate/flags" ) ) {
-			$gt_tok = self::encrypt_token( "d", "gtranslate/flags" );
-			$this->copy_dir_filtered( $plugin_dir . "/gtranslate/flags", $v_dir . "/d/" . $gt_tok );
+		foreach ( $this->export_directories as $token => $directory ) {
+			$this->copy_dir_filtered( $directory, $v_dir . '/d/' . $token );
 		}
 
 		return $count;
@@ -732,7 +748,7 @@ class Gamb_Security_Suite {
 				new \RecursiveDirectoryIterator( $dir, \RecursiveDirectoryIterator::SKIP_DOTS )
 			);
 			foreach ( $iterator as $path => $info ) {
-				if ( ! $info->isFile() ) {
+				if ( ! $info->isFile() || $info->isLink() ) {
 					continue;
 				}
 				$ext = strtolower( pathinfo( $path, PATHINFO_EXTENSION ) );
@@ -749,13 +765,13 @@ class Gamb_Security_Suite {
 		if ( ! is_dir( $src_dir ) ) {
 			return;
 		}
-		$allowed_exts = array( "css", "js", "mjs", "json", "jpg", "jpeg", "png", "gif", "webp", "avif", "svg", "ico", "woff2", "woff", "ttf", "eot", "otf" );
+		$allowed_exts = array( "css", "js", "mjs", "jpg", "jpeg", "png", "gif", "webp", "avif", "svg", "ico", "woff2", "woff", "ttf", "eot", "otf" );
 		$base_len     = strlen( rtrim( $src_dir, "/\\" ) ) + 1;
 		$iterator     = new \RecursiveIteratorIterator(
 			new \RecursiveDirectoryIterator( $src_dir, \RecursiveDirectoryIterator::SKIP_DOTS )
 		);
 		foreach ( $iterator as $path => $info ) {
-			if ( ! $info->isFile() ) {
+			if ( ! $info->isFile() || $info->isLink() ) {
 				continue;
 			}
 			$ext = strtolower( pathinfo( $path, PATHINFO_EXTENSION ) );
@@ -770,11 +786,11 @@ class Gamb_Security_Suite {
 	}
 
 	public function maybe_auto_configure_options() {
-		$applied_version = get_option( self::OPTION_FLAG, "" );
-		if ( self::PROFILE_VERSION === $applied_version ) {
-			return;
+		// Atualizações não reaplicam nem sobrescrevem o perfil escolhido pelo administrador.
+		if ( false === get_option( self::OPTION_FLAG, false ) ) {
+			Options::instance()->save();
+			add_option( self::OPTION_FLAG, self::PROFILE_VERSION, '', false );
 		}
-		self::apply_hardened_profile();
 	}
 
 	public static function apply_hardened_profile() {
@@ -810,7 +826,7 @@ class Gamb_Security_Suite {
 			"sftp_user",
 			"sftp_pass",
 			"sftp_folder",
-			"ss_webhook_url",
+			"webhook_url",
 		);
 
 		$merged = $defaults;
@@ -832,10 +848,7 @@ class Gamb_Security_Suite {
 		if ( function_exists( "wp_cache_flush" ) ) {
 			@wp_cache_flush();
 		}
-		do_action( "litespeed_purge_all" );
-		if ( class_exists( "\\LiteSpeed\\Purge" ) && method_exists( "\\LiteSpeed\\Purge", "purge_all" ) ) {
-			@\LiteSpeed\Purge::purge_all();
-		}
+		do_action( "gamb_wp_static_guard_purge_page_caches" );
 	}
 
 	private function enforce_origin_hardening() {
@@ -877,7 +890,7 @@ class Gamb_Security_Suite {
 			remove_action( "wp_head", "wlwmanifest_link" );
 		}
 		if ( $opts->get( "hide_prefetch", true ) ) {
-			remove_action( "wp_head", "wp_resource_hints", 2 );
+			add_filter( 'wp_resource_hints', static function( $hints, $relation ) { return 'dns-prefetch' === $relation ? array() : $hints; }, 10, 2 );
 		}
 		if ( $opts->get( "hide_emotes", true ) ) {
 			remove_action( "wp_head", "print_emoji_detection_script", 7 );
@@ -901,9 +914,9 @@ class Gamb_Security_Suite {
 				$headers["Referrer-Policy"]            = "strict-origin-when-cross-origin";
 				$headers["Permissions-Policy"]         = "accelerometer=(), camera=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=(), usb=()";
 				$headers["Cross-Origin-Opener-Policy"] = "same-origin-allow-popups";
-				$headers["Content-Security-Policy"]    = "upgrade-insecure-requests; frame-ancestors \x27self\x27; object-src \x27none\x27; base-uri \x27self\x27;";
+				$headers["Content-Security-Policy"]    = "frame-ancestors \x27self\x27; object-src \x27none\x27; base-uri \x27self\x27;";
 				if ( is_ssl() ) {
-					$headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains; preload";
+					$headers["Strict-Transport-Security"] = "max-age=31536000";
 				}
 				return $headers;
 			}, 999 );
@@ -957,28 +970,26 @@ class Gamb_Security_Suite {
 	}
 
 	public static function maybe_install_mu_plugin() {
-		$mu_dir = defined( "WPMU_PLUGIN_DIR" ) ? WPMU_PLUGIN_DIR : ( WP_CONTENT_DIR . "/mu-plugins" );
-		if ( ! is_dir( $mu_dir ) ) {
-			@wp_mkdir_p( $mu_dir );
-		}
-		if ( ! is_dir( $mu_dir ) || ! is_writable( $mu_dir ) ) {
-			return;
-		}
-
-		$mu_file = trailingslashit( $mu_dir ) . "gamb-static-origin-shield.php";
-		$mu_code = "<?php\n"
-			. "/**\n"
-			. " * Plugin Name: Gamb WP Static Guard — Origin Shield (Auto-Instalado)\n"
-			. " * Description: Camada de proteção imediata do Gamb WP Static Guard contra enumeração de usuários, XML-RPC, REST API anônima e cabeçalhos inseguros.\n"
-			. " * Version: 3.0.0\n"
-			. " * Author: Gamb\n"
-			. " */\n"
-			. "if ( ! defined( \x27ABSPATH\x27 ) ) { exit; }\n"
-			. "if ( ! defined( \x27DISALLOW_FILE_EDIT\x27 ) ) { define( \x27DISALLOW_FILE_EDIT\x27, true ); }\n"
-			. "add_filter( \x27xmlrpc_enabled\x27, \x27__return_false\x27, 999 );\n"
-			. "add_filter( \x27x_redirect_by\x27, \x27__return_false\x27, 999 );\n";
-
-		@file_put_contents( $mu_file, $mu_code );
+		$directory = defined( 'WPMU_PLUGIN_DIR' ) ? WPMU_PLUGIN_DIR : WP_CONTENT_DIR . '/mu-plugins';
+		if ( ! wp_mkdir_p( $directory ) || ! is_writable( $directory ) ) { return false; }
+		$file = trailingslashit( $directory ) . 'gamb-static-origin-shield.php';
+		$code = <<<'PHP'
+<?php
+/** Plugin Name: Gamb WP Static Guard - Proteção da origem
+ * Version: 4.0.0
+ * License: GPL-2.0-or-later
+ */
+if ( ! defined( 'ABSPATH' ) ) { exit; }
+$entry = 'gamb-wp-static-guard/gamb-wp-static-guard.php';
+$active = in_array( $entry, (array) get_option( 'active_plugins', array() ), true );
+$network = is_multisite() && isset( get_site_option( 'active_sitewide_plugins', array() )[$entry] );
+if ( ! $active && ! $network ) { return; }
+if ( ! defined( 'DISALLOW_FILE_EDIT' ) ) { define( 'DISALLOW_FILE_EDIT', true ); }
+add_filter( 'xmlrpc_enabled', '__return_false', 999 );
+add_filter( 'x_redirect_by', '__return_false', 999 );
+PHP;
+		if ( is_file( $file ) && file_get_contents( $file ) === $code ) { return true; }
+		return false !== file_put_contents( $file, $code );
 	}
 
 	public static function get_htaccess_content() {
@@ -1012,7 +1023,7 @@ class Gamb_Security_Suite {
 			. "  Referrer-Policy: strict-origin-when-cross-origin\n"
 			. "  Permissions-Policy: accelerometer=(), camera=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=(), usb=()\n"
 			. "  Cross-Origin-Opener-Policy: same-origin-allow-popups\n"
-			. "  Strict-Transport-Security: max-age=31536000; includeSubDomains; preload\n"
+			. "  Strict-Transport-Security: max-age=31536000\n"
 			. "  Content-Security-Policy: upgrade-insecure-requests; frame-ancestors \x27self\x27; object-src \x27none\x27; base-uri \x27self\x27;\n\n"
 			. "/v/*\n"
 			. "  Cache-Control: public, max-age=0, must-revalidate\n";

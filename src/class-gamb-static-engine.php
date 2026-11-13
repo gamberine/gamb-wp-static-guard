@@ -1,19 +1,19 @@
 <?php
 
-namespace Simply_Static;
+namespace GambWPStaticGuard;
 
 if ( ! defined( "ABSPATH" ) ) {
 	exit;
 }
 
 /**
- * Gamb WP Static Guard — 1. STATIC (Motor de Conversão, Otimização, Busca Local e Publicação Estática).
+ * Gamb WP Static Guard - 1. STATIC (Motor de Conversão, Otimização, Busca Local e Publicação Estática).
  *
  * Suporta:
- * - Somente o Tema (theme — Prioridade Rápida)
- * - Apenas Alterações (update — Incremental)
- * - Página Única (single — Single Push / Auto Push)
- * - Site Completo (export — Full Site)
+ * - Somente o Tema (theme - Prioridade Rápida)
+ * - Apenas Alterações (update - Incremental)
+ * - Página Única (single - Single Push / Auto Push)
+ * - Site Completo (export - Full Site)
  */
 class Static_Engine {
 
@@ -109,10 +109,10 @@ class Static_Engine {
 		$archive_dir = trailingslashit( $opts->get_archive_dir() );
 
 		$scope_labels = array(
-			"theme"  => "Somente o Tema (Prioridade)",
-			"update" => "Apenas Alterações (Incremental)",
-			"single" => "Página Única (Single Push)",
-			"export" => "Site Completo (Full Site)",
+			"theme"  => "Recursos do tema",
+			"update" => "Atualização completa",
+			"single" => "Publicação do conteúdo",
+			"export" => "Site completo",
 		);
 		$scope_label = isset( $scope_labels[ $scope ] ) ? $scope_labels[ $scope ] : $scope;
 
@@ -122,7 +122,7 @@ class Static_Engine {
 			Backup_Service::create_backup( "db" );
 		}
 
-		self::log_activity( "Iniciando exportação estática — Escopo: " . $scope_label );
+		self::log_activity( "Iniciando exportação estática - Escopo: " . $scope_label );
 
 		// Limpa o diretório temporário quando for exportação de tema ou site completo
 		if ( in_array( $scope, array( "theme", "export" ), true ) && $opts->get( "clear_directory_before_export", true ) ) {
@@ -163,19 +163,19 @@ class Static_Engine {
 				}
 
 				// Aplica camuflagem GUARD (tokenização /v/<token>, limpeza de comentários, sanitização DOM)
-				$processed_html = $guard->cloak_html_content( $html );
+				$processed_html = Frontend_Policy::postprocess_html( $guard->cloak_html_content( $html ) );
 				$guard->register_tokens_in_content( $processed_html );
 
 				// Aplica substituição de URLs conforme modo selecionado (relative, absolute, offline)
 				$processed_html = $this->apply_url_replacement_mode( $processed_html, $rel_file );
 
-				// Coleta dados para o índice de busca local Fuse.js
+				// Coleta dados para o índice de busca local busca local
 				if ( $opts->get( "use_search", true ) && "404.html" !== $rel_file ) {
 					$item = $this->extract_search_item( $processed_html, $url_info["public_path"] );
 					if ( $item ) {
 						$search_items[] = $item;
 					}
-					$processed_html = $this->inject_fuse_search_script( $processed_html );
+					$processed_html = $this->inject_local_search_script( $processed_html );
 				}
 
 				// Aplica Defer JS e Minificação HTML se ativados
@@ -192,12 +192,12 @@ class Static_Engine {
 				$exported_cnt++;
 			}
 
-			// Gera índice de busca estática local Fuse.js
+			// Gera índice de busca estática local busca local
 			if ( $opts->get( "use_search", true ) && ! empty( $search_items ) ) {
 				$index_json = wp_json_encode( $search_items, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES );
-				$this->write_export_file( $archive_dir . "simply-static-search-index.json", $index_json );
+				$this->write_export_file( $archive_dir . "search-index.json", $index_json );
 				$exported_cnt++;
-				self::log_activity( sprintf( "Índice de busca local (Fuse.js) gerado com %d páginas indexadas.", count( $search_items ) ) );
+				self::log_activity( sprintf( "Índice de pesquisa local gerado com %d páginas indexadas.", count( $search_items ) ) );
 			}
 		}
 
@@ -427,7 +427,7 @@ class Static_Engine {
 				"timeout"   => 25,
 				"sslverify" => true,
 				"headers"   => array(
-					"User-Agent" => "Gamb-WP-Static-Guard/3.0.0",
+					"User-Agent" => "Gamb-WP-Static-Guard/" . GAMB_STATIC_WP_VERSION,
 				),
 			)
 		);
@@ -500,7 +500,7 @@ class Static_Engine {
 		);
 
 		foreach ( $iterator as $path => $info ) {
-			if ( ! $info->isFile() ) {
+			if ( ! $info->isFile() || $info->isLink() ) {
 				continue;
 			}
 			$ext = strtolower( pathinfo( $path, PATHINFO_EXTENSION ) );
@@ -574,7 +574,7 @@ class Static_Engine {
 		$files = array();
 		$iterator = new \RecursiveIteratorIterator( new \RecursiveDirectoryIterator( $archive_dir, \RecursiveDirectoryIterator::SKIP_DOTS ) );
 		foreach ( $iterator as $path => $info ) {
-			if ( $info->isFile() ) { $files[] = wp_normalize_path( $path ); }
+			if ( $info->isFile() && ! $info->isLink() ) { $files[] = wp_normalize_path( $path ); }
 		}
 		if ( class_exists( "\\ZipArchive" ) ) {
 			$zip = new \ZipArchive();
@@ -584,7 +584,7 @@ class Static_Engine {
 					new \RecursiveDirectoryIterator( $archive_dir, \RecursiveDirectoryIterator::SKIP_DOTS )
 				);
 				foreach ( $iterator as $path => $info ) {
-					if ( $info->isFile() ) {
+					if ( $info->isFile() && ! $info->isLink() ) {
 						$rel = str_replace( "\\", "/", substr( $path, $base_len ) );
 						$zip->addFile( $path, $rel );
 					}
@@ -647,7 +647,7 @@ class Static_Engine {
 		$prefix = strlen( trailingslashit( $archive ) );
 		$iterator = new \RecursiveIteratorIterator( new \RecursiveDirectoryIterator( $archive, \RecursiveDirectoryIterator::SKIP_DOTS ) );
 		foreach ( $iterator as $path => $info ) {
-			if ( $info->isFile() ) { $current[] = str_replace( '\\', '/', substr( $path, $prefix ) ); }
+			if ( $info->isFile() && ! $info->isLink() ) { $current[] = str_replace( '\\', '/', substr( $path, $prefix ) ); }
 		}
 		if ( 'export' === $scope && Options::instance()->get( 'clear_directory_before_export', true ) ) {
 			foreach ( array_diff( $previous, $current ) as $relative ) {
@@ -679,7 +679,7 @@ class Static_Engine {
 			new \RecursiveDirectoryIterator( $src, \RecursiveDirectoryIterator::SKIP_DOTS )
 		);
 		foreach ( $iterator as $path => $info ) {
-			if ( $info->isFile() ) {
+			if ( $info->isFile() && ! $info->isLink() ) {
 				$rel  = str_replace( "\\", "/", substr( $path, $base_len ) );
 				$dest = trailingslashit( $dst ) . $rel;
 				@wp_mkdir_p( dirname( $dest ) );
@@ -732,12 +732,12 @@ class Static_Engine {
 		);
 	}
 
-	private function inject_fuse_search_script( $html ) {
+	private function inject_local_search_script( $html ) {
 		if ( strpos( $html, 'id="gamb-static-search"' ) !== false || stripos( $html, '</body>' ) === false ) {
 			return $html;
 		}
 		$src = $this->apply_url_replacement_mode( home_url( '/static/search.js' ), 'index.html' );
-		$index = $this->apply_url_replacement_mode( home_url( '/simply-static-search-index.json' ), 'index.html' );
+		$index = $this->apply_url_replacement_mode( home_url( '/search-index.json' ), 'index.html' );
 		$script = '<script id="gamb-static-search" defer src="' . esc_url( $src ) . '" data-index="' . esc_url( $index ) . '"></script>';
 		return preg_replace( '#</body>#i', $script . '</body>', $html, 1 );
 	}
@@ -823,9 +823,9 @@ class Static_Engine {
 
 	private function schedule_auto_export( $post ) {
 		$opts = Options::instance();
-		if ( ! in_array( $post->post_type, (array) $opts->get( 'post_types', array() ), true ) ) { return; }
-		if ( $opts->get( "ss_use_single_exports", true ) && $opts->get( "ss_single_auto_export", true ) && ! wp_next_scheduled( 'gamb_static_guard_auto_export_cron', array( 0 ) ) ) {
-			$delay = max( 0, (int) $opts->get( "ss_single_auto_export_delay", 0 ) );
+		if ( ! in_array( $post->post_type, (array) ( $opts->get( 'post_types', array() ) ?: get_post_types( array( 'public' => true ), 'names' ) ), true ) ) { return; }
+		if ( $opts->get( "single_enabled", true ) && $opts->get( "auto_export", true ) && ! wp_next_scheduled( 'gamb_static_guard_auto_export_cron', array( 0 ) ) ) {
+			$delay = max( 0, (int) $opts->get( "auto_export_delay", 0 ) );
 			wp_schedule_single_event( time() + max( 2, $delay ), 'gamb_static_guard_auto_export_cron', array( 0 ) );
 		}
 	}
@@ -837,7 +837,7 @@ class Static_Engine {
 
 	private function maybe_dispatch_webhook( $scope, $files_count ) {
 		$opts        = Options::instance();
-		$webhook_url = trim( (string) $opts->get( "ss_webhook_url", "" ) );
+		$webhook_url = trim( (string) $opts->get( "webhook_url", "" ) );
 		if ( "" === $webhook_url || ! wp_http_validate_url( $webhook_url ) ) {
 			return;
 		}
