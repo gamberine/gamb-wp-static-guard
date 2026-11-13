@@ -1,5 +1,15 @@
 # Registro de validação
 
+## Versão 4.2.0 — 13/11/2026
+
+Foram concluídas 56 regressões independentes e 17 verificações adicionais utilizando o parser da HTML API oficial: 73 verificações com o WordPress 6.2 e 72 com a distribuição instalada no ambiente de integração. A integração contínua também executa essa suíte sobre a distribuição oficial estável corrente.
+
+Os novos cenários abrangem seleção restrita do 404 de apoio, preservação de modelos de blocos e de outras extensões, detecção de origens externas, omissão de dados sensíveis das referências, canonical ausente e existente, diretivas do documento de erro, inventário de recursos e navegação, CSS relativo sob token com importação circular e SRI calculado sobre os bytes finais.
+
+Na instalação consumidora, a exportação completa processou 206 arquivos, preservou os 398 registros e metadados editoriais e manteve seis backups. Foram conferidas 377 referências SRI em 22 documentos HTML, correspondentes a 20 arquivos distintos, sem divergência de hash. O painel de diagnóstico foi utilizado com autenticação administrativa em 1440 e 390 px, incluindo atualização do relatório e conferência dos quatro novos controles.
+
+O navegador conferiu Home e erros na origem, na publicação local, no celular e na prévia de rede, com bloqueio dos hosts externos: nenhum recurso remoto solicitado ou erro de execução observado. Os 86 endereços locais consultados responderam sem falha. O modelo 404 próprio do tema consumidor foi preservado; os critérios de seleção do fallback genérico foram validados pelas regressões. Esses ensaios não constituem homologação de todos os temas, CDNs ou serviços possíveis.
+
 ## Versão 4.1.2 — 13/11/2026
 
 Foram concluídas 40 verificações independentes. As novas regressões abrangem a rejeição de captura da Home sem contexto autenticado, com erro lógico ou com status HTTP incompatível; o documento de erro exige HTTP 404 e contexto de erro real. As classes nativas de erro, pesquisa e arquivo são removidas, preservando as classes próprias do tema consumidor.

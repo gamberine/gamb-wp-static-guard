@@ -3,7 +3,7 @@
 $site = __DIR__ . '/runtime/site/';
 foreach ( array( '', 'wp-content/themes/example/', 'wp-content/uploads/', 'wp-content/plugins/', 'wp-includes/' ) as $part ) { if ( ! is_dir( $site . $part ) ) { mkdir( $site . $part, 0777, true ); } }
 file_put_contents( $site . 'wp-content/themes/example/style.css', 'body{color:#123456}' );
-define( 'ABSPATH', $site ); define( 'WP_CONTENT_DIR', $site . 'wp-content' ); define( 'WP_PLUGIN_DIR', WP_CONTENT_DIR . '/plugins' ); define( 'WPINC', 'wp-includes' ); define( 'AUTH_KEY', 'automated-fixture-not-a-production-secret' ); define( 'GAMB_STATIC_WP_VERSION', '4.1.2' );
+define( 'ABSPATH', $site ); define( 'WP_CONTENT_DIR', $site . 'wp-content' ); define( 'WP_PLUGIN_DIR', WP_CONTENT_DIR . '/plugins' ); define( 'WPINC', 'wp-includes' ); define( 'AUTH_KEY', 'automated-fixture-not-a-production-secret' ); define( 'GAMB_STATIC_WP_VERSION', '4.2.0' );
 $legacy_key = base64_decode( 'c2ltcGx5LXN0YXRpYw==' );
 $legacy = array( 'use_minify' => false, 'relative_path' => '0', 'local_dir' => '/dedicated/output', 'ss_single_auto_export' => false, 'ss_single_auto_export_delay' => 0 );
 $GLOBALS['fixture_options'] = array( $legacy_key => $legacy );
@@ -18,11 +18,13 @@ function wp_salt( $scheme = '' ) { return AUTH_KEY; }
 function untrailingslashit( $path ) { return rtrim( $path, '/\\' ); }
 function trailingslashit( $path ) { return untrailingslashit( $path ) . '/'; }
 function wp_normalize_path( $path ) { return str_replace( '\\', '/', $path ); }
+function wp_parse_url( $url, $component = -1 ) { return parse_url( $url, $component ); }
+function esc_url( $url ) { return htmlspecialchars( $url, ENT_QUOTES, 'UTF-8' ); }
 function get_stylesheet() { return 'example'; }
 function get_template() { return 'example'; }
 function get_stylesheet_directory() { return WP_CONTENT_DIR . '/themes/example'; }
 function get_template_directory() { return get_stylesheet_directory(); }
-function wp_upload_dir() { return array( 'basedir' => WP_CONTENT_DIR . '/uploads' ); }
+function wp_upload_dir() { return array( 'basedir' => WP_CONTENT_DIR . '/uploads', 'baseurl' => home_url( '/wp-content/uploads' ) ); }
 function get_temp_dir() { return trailingslashit( sys_get_temp_dir() ); }
 function wp_mkdir_p( $path ) { return is_dir( $path ) || mkdir( $path, 0777, true ); }
 require dirname( __DIR__ ) . '/src/class-gamb-options.php';
@@ -30,6 +32,7 @@ require dirname( __DIR__ ) . '/src/class-gamb-guard-suite.php';
 require dirname( __DIR__ ) . '/src/class-gamb-frontend-policy.php';
 require dirname( __DIR__ ) . '/src/class-gamb-static-engine.php';
 require dirname( __DIR__ ) . '/src/class-gamb-backup-service.php';
+require dirname( __DIR__ ) . '/src/class-gamb-installation-checks.php';
 function date_i18n( $format, $timestamp = null ) { return date( $format, $timestamp ?? time() ); }
 function size_format( $size ) { return $size . ' B'; }
 function admin_url( $path ) { return 'https://example.test/wp-admin/' . $path; }
@@ -45,6 +48,9 @@ expect( $options->get( 'relative_path' ) === '0', 'Preservar string zero.' );
 expect( $options->get( 'auto_export' ) === false, 'Preservar opção automática desativada.' );
 expect( $options->get( 'auto_export_delay' ) === 0, 'Preservar zero inteiro.' );
 expect( get_option( $legacy_key ) === $legacy, 'Preservar a origem da migração.' );
+$options->set( 'version', '4.0.0' )->save(); $before_upgrade = $options->get_all(); $before_upgrade['version'] = \GambWPStaticGuard\Options::VERSION;
+$options->synchronize_version();
+expect( $options->get_all() === $before_upgrade, 'Atualizar metadado de versão sem reaplicar padrões ou alterar configurações.' );
 $options->set( 'guard_clean_body_classes', true );
 expect( \GambWPStaticGuard\Frontend_Policy::body_classes( array( 'page', 'page-id-123', 'wp-singular', 'wp-theme-example', 'consumer-home', 'custom-layout' ) ) === array( 'consumer-home', 'custom-layout' ), 'Manter classes do projeto.' );
 $reflection = new ReflectionClass( '\GambWPStaticGuard\Gamb_Security_Suite' );
@@ -99,4 +105,20 @@ expect( ! $engine->capture_response_is_valid( home_url( '/news/' ), 200, 'front=
 expect( $engine->capture_response_is_valid( home_url( '/missing/' ), 404, 'front=0;error=1', true ), 'Aceitar erro 404 esperado.' );
 expect( ! $engine->capture_response_is_valid( home_url( '/missing/' ), 200, 'front=0;error=1', true ), 'Exigir HTTP 404 real no documento de erro.' );
 expect( $engine->capture_response_is_valid( home_url( '/manual.html' ), 200, '' ), 'Preservar captura de HTML local fora do roteamento WordPress.' );
+expect( \GambWPStaticGuard\Installation_Checks::should_use_fallback( true, false, false, '/theme/index.php', '/theme/index.php' ), 'Disponibilizar erro de apoio somente no fallback clássico.' );
+expect( ! \GambWPStaticGuard\Installation_Checks::should_use_fallback( false, false, false, '/theme/index.php', '/theme/index.php' ), 'Preservar página normal.' );
+expect( ! \GambWPStaticGuard\Installation_Checks::should_use_fallback( true, true, false, '/theme/index.php', '/theme/index.php' ), 'Preservar modelo de erro do tema.' );
+expect( ! \GambWPStaticGuard\Installation_Checks::should_use_fallback( true, false, true, '/theme/index.php', '/theme/index.php' ), 'Preservar modelos de blocos.' );
+expect( ! \GambWPStaticGuard\Installation_Checks::should_use_fallback( true, false, false, '/another-plugin/error.php', '/theme/index.php' ), 'Preservar modelo de outra extensão.' );
+expect( ! \GambWPStaticGuard\Installation_Checks::should_use_fallback( true, false, false, '', '' ), 'Não selecionar fallback sem modelo válido.' );
+expect( \GambWPStaticGuard\Installation_Checks::external_url( 'https://cdn.example.test/file.css' ), 'Identificar dependência externa.' );
+expect( \GambWPStaticGuard\Installation_Checks::external_url( '//cdn.example.test/file.css' ), 'Identificar dependência com protocolo relativo.' );
+expect( ! \GambWPStaticGuard\Installation_Checks::external_url( 'https://example.test/site/file.css' ), 'Preservar recursos da origem.' );
+expect( \GambWPStaticGuard\Installation_Checks::external_url( 'https://example.test:9443/file.css' ), 'Distinguir recurso de outra porta.' );
+expect( ! \GambWPStaticGuard\Installation_Checks::external_url( 'data:image/png;base64,AAAA' ), 'Não classificar dados incorporados como CDN.' );
+expect( ! \GambWPStaticGuard\Installation_Checks::external_url( '/local/file.css' ), 'Não classificar caminho local como CDN.' );
+expect( \GambWPStaticGuard\Installation_Checks::public_reference( 'https://user:secret@cdn.test/a.css?token=private#fragment' ) === 'https://cdn.test/a.css?[parâmetros omitidos]', 'Não persistir credenciais, parâmetros ou fragmentos do recurso.' );
+expect( \GambWPStaticGuard\Options::get_default_options()['guard_clean_body_classes'] === false && \GambWPStaticGuard\Options::get_default_options()['guard_remove_block_styles'] === false, 'Não presumir dependências de CSS e classes do tema.' );
+expect( \GambWPStaticGuard\Options::get_default_options()['fallback_404'] && \GambWPStaticGuard\Options::get_default_options()['ensure_home_canonical'] && \GambWPStaticGuard\Options::get_default_options()['refresh_local_integrity'], 'Disponibilizar integrações portáteis nas novas instalações.' );
+if ( getenv( 'GAMB_WP_HTML_API' ) ) { require __DIR__ . '/html-api.php'; }
 echo $checks . " verificações independentes concluídas.\n";

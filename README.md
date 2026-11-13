@@ -4,7 +4,7 @@
 
 Extensão para WordPress destinada à geração de sites estáticos, à publicação em diretório local ou arquivo ZIP e à redução da exposição de informações técnicas na saída pública.
 
-**Versão de referência:** 4.1.2. **Licença:** GPL-2.0-or-later. **Manutenção:** [gamberine](https://github.com/gamberine).
+**Versão de referência:** 4.2.0. **Licença:** GPL-2.0-or-later. **Manutenção:** [gamberine](https://github.com/gamberine).
 
 ## Finalidade e limites
 
@@ -21,6 +21,8 @@ Endereços opacos não constituem controle de acesso. Arquivos publicados perman
 - Endereços de recursos no formato `/v/<token>`, com validação de caminho e lista de tipos permitidos.
 - Validação que interrompe a entrega quando permanecem referências internas não resolvidas no HTML.
 - Controles opcionais para estilos nativos, classes do corpo, versões de recursos e pré-carregamento especulativo.
+- Diagnóstico inicial, inventário de dependências externas e requisito opcional de recursos locais antes da entrega.
+- Página 404 de apoio para temas clássicos sem modelo próprio, canonical ausente da Home e SRI dos recursos tokenizados finais.
 - Cópias administrativas do banco ou do banco com tema e extensões. O segundo pacote requer a extensão ZIP e não abrange uploads nem toda a instalação.
 
 ## Instalação
@@ -28,7 +30,7 @@ Endereços opacos não constituem controle de acesso. Arquivos publicados perman
 1. Obtenha o pacote da versão em [Releases](https://github.com/gamberine/gamb-wp-static-guard/releases).
 2. Confira o arquivo `SHA256SUMS` correspondente ao pacote.
 3. Em ambiente de homologação, instale o ZIP em **Plugins > Adicionar plugin > Enviar plugin**.
-4. Ative o plugin e abra **Gamb Static Guard**.
+4. Ative o plugin e abra **Gamb Static Guard**. O diagnóstico inicial será executado; confira a aba **Diagnóstico da instalação**.
 5. Configure destino, escopo, tipos de conteúdo e caminho público.
 6. Execute uma publicação e valide navegação, documentos, pesquisa, responsividade e registros de execução.
 
@@ -50,7 +52,9 @@ O painel apresenta caixas recolhíveis separadas para **STATIC/Conversão - HTML
 
 O gerenciador mantém somente as **seis cópias de segurança mais recentes**, somando todos os tipos. A retenção ocorre após a conclusão de uma nova cópia, sem remover arquivos de terceiros.
 
-A captura da raiz exige HTTP 200 e confirmação de que a origem está em contexto de página inicial, sem erro 404. A página de erro exige HTTP 404 real. Respostas incompatíveis interrompem a entrega e preservam a publicação anterior. O tema consumidor deve fornecer o conteúdo visual do documento de erro.
+A captura da raiz exige HTTP 200 e confirmação de que a origem está em contexto de página inicial, sem erro 404. A página de erro exige HTTP 404 real. Respostas incompatíveis interrompem a entrega e preservam a publicação anterior. Temas clássicos sem `404.php` recebem um modelo de apoio quando usam o fallback `index.php`; modelos próprios e de blocos são preservados.
+
+O canonical é acrescentado somente quando ausente na Home exportada. O SRI dos estilos e scripts tokenizados é calculado sobre os arquivos finais. O diagnóstico distingue recursos externos de links de navegação; a opção de exigir recursos locais permanece desabilitada por padrão e pode impedir a entrega quando ativada. A análise não executa JavaScript nem baixa bibliotecas externas. Consulte a [matriz de portabilidade](docs/PORTABILITY.md) para identificar o que já é automático e o que depende do consumidor.
 
 ## Identificadores públicos
 

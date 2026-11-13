@@ -2,6 +2,18 @@
 
 Este documento distingue a incorporação histórica das novas alterações. As datas correspondem ao registro verificável, sem reconstruir datas de commits inexistentes.
 
+## 4.2.0 - 2026-11-13
+
+- Extrair as correções reutilizáveis do consumidor e documentar a matriz de portabilidade e os limites de automação.
+- Acrescentar diagnóstico inicial e reexecução administrativa, com inventário de dependências externas em HTML e CSS local.
+- Distinguir links de navegação das dependências; omitir credenciais e parâmetros de URLs persistidas.
+- Oferecer modelo 404 de apoio para temas clássicos sem modelo próprio, preservando temas de blocos e modelos de outras extensões.
+- Completar canonical ausente da Home exportada e assegurar noindex sem canonical no documento de erro.
+- Calcular SRI de estilos e scripts tokenizados sobre os arquivos finais da exportação.
+- Oferecer bloqueio opcional de publicação com dependências externas identificadas ou inspeção incompleta.
+- Ampliar regressões e testar a HTML API oficial do WordPress 6.2 e da distribuição estável corrente.
+- Atualizar o metadado de versão da instalação sem reaplicar o perfil nem sobrescrever configurações.
+
 ## 4.1.2 - 2026-11-13
 
 - Recusar captura da Home com HTTP incorreto ou contexto de erro, confirmando is_front_page e is_404 na origem por cabeçalho solicitado com assinatura.

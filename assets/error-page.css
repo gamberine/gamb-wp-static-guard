@@ -1,0 +1,5 @@
+.gamb-static-error-page { padding:clamp(2rem,6vw,5rem) 1rem; min-height:45vh; color:inherit; background:transparent; }
+.gamb-static-error-panel { box-sizing:border-box; max-width:48rem; margin-inline:auto; padding:clamp(1.5rem,4vw,3rem); border:1px solid currentColor; border-radius:.75rem; font-family:inherit; }
+.gamb-static-error-panel h1 { font-size:clamp(1.8rem,5vw,3rem); line-height:1.2; margin:0 0 1rem; overflow-wrap:anywhere; }
+.gamb-static-error-panel p { line-height:1.7; }
+.gamb-static-error-panel a { display:inline-block; color:inherit; font-weight:700; text-decoration:underline; text-underline-offset:.2em; overflow-wrap:anywhere; }
