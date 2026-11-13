@@ -4,7 +4,7 @@
 
 Extensão para WordPress destinada à geração de sites estáticos, à publicação em diretório local ou arquivo ZIP e à redução da exposição de informações técnicas na saída pública.
 
-**Versão de referência:** 4.1.0. **Licença:** GPL-2.0-or-later. **Manutenção:** [gamberine](https://github.com/gamberine).
+**Versão de referência:** 4.1.1. **Licença:** GPL-2.0-or-later. **Manutenção:** [gamberine](https://github.com/gamberine).
 
 ## Finalidade e limites
 
