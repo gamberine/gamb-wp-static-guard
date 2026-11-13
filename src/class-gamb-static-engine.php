@@ -158,7 +158,7 @@ class Static_Engine {
 				$url_info = $urls[ $cursor ];
 				$url      = $url_info["url"];
 				$rel_file = $url_info["rel_file"];
-				$html     = $this->fetch_local_url_html( $url );
+				$html     = $this->fetch_local_url_html( $url, '404.html' === $rel_file );
 				if ( "" === trim( $html, "\xEF\xBB\xBF \t\r\n" ) ) {
 					$page_failures[] = $url;
 					continue;
@@ -427,7 +427,18 @@ class Static_Engine {
 		}
 	}
 
-	private function fetch_local_url_html( $url ) {
+	/** Recusa erros disfarçados de página válida, especialmente na raiz da publicação. */
+	public function capture_response_is_valid( $url, $status, $context, $expected_404 = false ) {
+		$identified = preg_match( '/^front=([01]);error=([01])$/D', trim( (string) $context ), $flags );
+		if ( $expected_404 ) { return 404 === $status && $identified && '0' === $flags[1] && '1' === $flags[2]; }
+		if ( 200 !== $status || ( $identified && '1' === $flags[2] ) || ( '' !== (string) $context && ! $identified ) ) { return false; }
+		if ( untrailingslashit( $url ) === untrailingslashit( home_url( '/' ) ) ) {
+			return $identified && '1' === $flags[1] && '0' === $flags[2];
+		}
+		return true;
+	}
+
+	private function fetch_local_url_html( $url, $expected_404 = false ) {
 		$resp = wp_remote_get(
 			$url,
 			array(
@@ -435,6 +446,7 @@ class Static_Engine {
 				"sslverify" => true,
 				"headers"   => array(
 					"User-Agent" => "Gamb-WP-Static-Guard/" . GAMB_STATIC_WP_VERSION,
+					'X-Gamb-Static-Export' => Frontend_Policy::export_context_token(),
 				),
 			)
 		);
@@ -443,8 +455,9 @@ class Static_Engine {
 			return '';
 		}
 		$code = wp_remote_retrieve_response_code( $resp );
-		if ( 200 !== $code && ! ( 404 === $code && false !== strpos( $url, '/gamb-static-guard-missing-page-404/' ) ) ) {
-			self::log_activity( 'Falha HTTP ' . $code . ' ao buscar ' . $url );
+		$context = wp_remote_retrieve_header( $resp, 'x-gamb-static-context' );
+		if ( ! $this->capture_response_is_valid( $url, $code, $context, $expected_404 ) ) {
+			self::log_activity( 'Captura recusada: status HTTP ou contexto da página incompatível em ' . $url . ' (HTTP ' . $code . ').' );
 			return '';
 		}
 		return (string) wp_remote_retrieve_body( $resp );

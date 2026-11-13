@@ -1,5 +1,15 @@
 # Registro de validação
 
+## Versão 4.1.2 — 13/11/2026
+
+Foram concluídas 40 verificações independentes. As novas regressões abrangem a rejeição de captura da Home sem contexto autenticado, com erro lógico ou com status HTTP incompatível; o documento de erro exige HTTP 404 e contexto de erro real. As classes nativas de erro, pesquisa e arquivo são removidas, preservando as classes próprias do tema consumidor.
+
+Na integração WordPress, a Home respondeu com HTTP 200, `is_front_page() = true` e `is_404() = false`; a rota inexistente respondeu com HTTP 404 e contexto de erro. A exportação completa processou 206 arquivos. Os 398 registros de conteúdo e respectivos metadados editoriais permaneceram inalterados; a retenção permaneceu em seis cópias. O modelo visual da página de erro pertence ao tema consumidor.
+
+A publicação preserva o título e a classe da Home e converte o canonical para o endereço estático configurado. As bibliotecas locais do consumidor foram preservadas. Esses resultados descrevem o ambiente de integração observado, sem substituir homologação em outros ambientes.
+
+## Registro anterior — versão 4.1.0
+
 Data: 13/11/2026. Versão: 4.1.0. Ambiente de integração: WordPress 7.1.4, PHP 8.3.26, Apache e navegador Chromium.
 
 ## Verificações independentes

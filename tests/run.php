@@ -3,7 +3,7 @@
 $site = __DIR__ . '/runtime/site/';
 foreach ( array( '', 'wp-content/themes/example/', 'wp-content/uploads/', 'wp-content/plugins/', 'wp-includes/' ) as $part ) { if ( ! is_dir( $site . $part ) ) { mkdir( $site . $part, 0777, true ); } }
 file_put_contents( $site . 'wp-content/themes/example/style.css', 'body{color:#123456}' );
-define( 'ABSPATH', $site ); define( 'WP_CONTENT_DIR', $site . 'wp-content' ); define( 'WP_PLUGIN_DIR', WP_CONTENT_DIR . '/plugins' ); define( 'WPINC', 'wp-includes' ); define( 'AUTH_KEY', 'automated-fixture-not-a-production-secret' ); define( 'GAMB_STATIC_WP_VERSION', '4.1.1' );
+define( 'ABSPATH', $site ); define( 'WP_CONTENT_DIR', $site . 'wp-content' ); define( 'WP_PLUGIN_DIR', WP_CONTENT_DIR . '/plugins' ); define( 'WPINC', 'wp-includes' ); define( 'AUTH_KEY', 'automated-fixture-not-a-production-secret' ); define( 'GAMB_STATIC_WP_VERSION', '4.1.2' );
 $legacy_key = base64_decode( 'c2ltcGx5LXN0YXRpYw==' );
 $legacy = array( 'use_minify' => false, 'relative_path' => '0', 'local_dir' => '/dedicated/output', 'ss_single_auto_export' => false, 'ss_single_auto_export_delay' => 0 );
 $GLOBALS['fixture_options'] = array( $legacy_key => $legacy );
@@ -14,6 +14,7 @@ function wp_load_alloptions() { return $GLOBALS['fixture_options']; }
 function maybe_unserialize( $value ) { return $value; }
 function is_admin() { return false; }
 function home_url( $path = '' ) { return 'https://example.test/site' . $path; }
+function wp_salt( $scheme = '' ) { return AUTH_KEY; }
 function untrailingslashit( $path ) { return rtrim( $path, '/\\' ); }
 function trailingslashit( $path ) { return untrailingslashit( $path ) . '/'; }
 function wp_normalize_path( $path ) { return str_replace( '\\', '/', $path ); }
@@ -88,4 +89,14 @@ expect( is_file( $backup_dir . '/unrelated.txt' ), 'Preservar arquivos não admi
 expect( ! \GambWPStaticGuard\Backup_Service::delete_backup( '../unrelated.txt' ), 'Bloquear exclusão fora do escopo.' );
 expect( \GambWPStaticGuard\Gamb_Security_Suite::strip_non_license_comments( '/*! Copyright Example. Licensed under MIT. */body{}/* internal */' ) === '/*! Copyright Example. Licensed under MIT. */body{}', 'Preservar licença e remover comentário interno de CSS.' );
 expect( strpos( $guard->sanitize_js_content( '/*! @license Example */function example(){}' ), '@license' ) !== false, 'Preservar aviso legal de JavaScript.' );
+expect( \GambWPStaticGuard\Frontend_Policy::body_classes( array( 'error404', 'search', 'search-results', 'search-no-results', 'archive', 'archive-date', 'gaepe-home', 'gaepe-erro', 'custom-layout' ) ) === array( 'gaepe-home', 'gaepe-erro', 'custom-layout' ), 'Remover classes nativas de erro, pesquisa e arquivo, preservando classes próprias.' );
+expect( strlen( \GambWPStaticGuard\Frontend_Policy::export_context_token() ) === 64, 'Assinar a identificação do contexto de captura.' );
+expect( $engine->capture_response_is_valid( home_url( '/' ), 200, 'front=1;error=0' ), 'Aceitar Home com HTTP 200 e contexto real correto.' );
+expect( ! $engine->capture_response_is_valid( home_url( '/' ), 200, 'front=0;error=1' ), 'Recusar soft 404 na Home.' );
+expect( ! $engine->capture_response_is_valid( home_url( '/' ), 404, 'front=1;error=0' ), 'Recusar HTTP 404 na Home.' );
+expect( ! $engine->capture_response_is_valid( home_url( '/' ), 200, '' ), 'Não publicar a Home sem confirmação do contexto.' );
+expect( ! $engine->capture_response_is_valid( home_url( '/news/' ), 200, 'front=0;error=1' ), 'Recusar página normal em contexto de erro.' );
+expect( $engine->capture_response_is_valid( home_url( '/missing/' ), 404, 'front=0;error=1', true ), 'Aceitar erro 404 esperado.' );
+expect( ! $engine->capture_response_is_valid( home_url( '/missing/' ), 200, 'front=0;error=1', true ), 'Exigir HTTP 404 real no documento de erro.' );
+expect( $engine->capture_response_is_valid( home_url( '/manual.html' ), 200, '' ), 'Preservar captura de HTML local fora do roteamento WordPress.' );
 echo $checks . " verificações independentes concluídas.\n";

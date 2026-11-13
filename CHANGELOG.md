@@ -2,6 +2,13 @@
 
 Este documento distingue a incorporação histórica das novas alterações. As datas correspondem ao registro verificável, sem reconstruir datas de commits inexistentes.
 
+## 4.1.2 - 2026-11-13
+
+- Recusar captura da Home com HTTP incorreto ou contexto de erro, confirmando is_front_page e is_404 na origem por cabeçalho solicitado com assinatura.
+- Exigir HTTP 404 real para o documento de erro e distinguir sua captura das páginas normais.
+- Acrescentar error404 e variações nativas de pesquisa e arquivo à limpeza opcional das classes do corpo.
+- Acrescentar regressões para Home, soft 404, documento de erro e classes próprias do consumidor.
+
 ## 4.1.1 - 2026-11-13
 
 - Preservar avisos de licença e direitos autorais nas bibliotecas CSS e JavaScript publicadas.
