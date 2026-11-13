@@ -266,10 +266,17 @@ class Gamb_Security_Suite {
 			return $js;
 		}
 		if ( Options::instance()->get( "guard_hide_theme_identity", true ) ) {
-			$js = preg_replace( "#^\\s*(?:/\\*[\\s\\S]*?\\*/\\s*)+#", "", $js );
+			$js = preg_replace_callback( "#^\\s*(?:/\\*[\\s\\S]*?\\*/\\s*)+#", static function( $match ) { return self::strip_non_license_comments( $match[0] ); }, $js );
 			$js = preg_replace( "~//[#@][ \\t]*source(?:Mapping)?URL=[^\\r\\n]*~", "", $js );
 		}
 		return $js;
+	}
+
+	/** Preserva avisos legais incorporados à distribuição dos recursos públicos. */
+	public static function strip_non_license_comments( $content ) {
+		return preg_replace_callback( '#/\\*[\\s\\S]*?\\*/#', static function( $match ) {
+			return preg_match( '/@license|\\blicen[cs]e(?:d)?\\b|\\bcopyright\\b|SPDX-/i', $match[0] ) ? $match[0] : '';
+		}, $content );
 	}
 
 	public function cloak_css_content( $css, $kind = "t", $css_rel = "style.css" ) {
@@ -278,7 +285,7 @@ class Gamb_Security_Suite {
 		}
 		$opts = Options::instance();
 		if ( $opts->get( "guard_hide_theme_identity", true ) ) {
-			$css = preg_replace( "#/\\*[\\s\\S]*?\\*/#", "", $css );
+			$css = self::strip_non_license_comments( $css );
 		}
 		if ( ! $opts->get( "guard_universal_token_cloaking", true ) ) {
 			return $css;

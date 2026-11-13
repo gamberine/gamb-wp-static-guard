@@ -2,6 +2,12 @@
 
 Este documento distingue a incorporação histórica das novas alterações. As datas correspondem ao registro verificável, sem reconstruir datas de commits inexistentes.
 
+## 4.1.1 - 2026-11-13
+
+- Preservar avisos de licença e direitos autorais nas bibliotecas CSS e JavaScript publicadas.
+- Manter a remoção de comentários internos e de referências de mapa de código.
+- Acrescentar regressões para preservação de avisos legais.
+
 ## 4.1.0 - 2026-11-13
 
 - Barra lateral com duas caixas recolhíveis separadas: STATIC/Conversão - HTML/ZIP e GUARD/Segurança - Blindado.
