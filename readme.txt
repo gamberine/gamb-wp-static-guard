@@ -4,7 +4,7 @@ Tags: static-site, export, security, local-search
 Requires at least: 6.2
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 4.1.1
+Stable tag: 4.1.2
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/old-licenses/gpl-2.0.html
 
@@ -38,7 +38,14 @@ https://github.com/gamberine/gamb-wp-static-guard
 
 == Registro de versões ==
 
+= 4.1.2 =
+Validação do status e do contexto WordPress da captura da Home e do documento
+de erro 404. Classes nativas de erro, pesquisa e arquivo removidas da publicação.
+
 = 4.1.1 =
+Preservação dos avisos de licença e direitos autorais das bibliotecas publicadas.
+
+= 4.1.0 =
 Barra lateral com caixas separadas para STATIC e GUARD, escopo independente,
 primeira publicação completa obrigatória e retenção dos seis backups mais recentes.
 

@@ -5,6 +5,7 @@ if ( ! defined( 'ABSPATH' ) ) { exit; }
 /** Controles de apresentação, condicionados ao perfil selecionado no site. */
 class Frontend_Policy {
     public static function register() {
+        add_action( 'template_redirect', array( __CLASS__, 'send_export_context' ), 0 );
         add_action( 'wp_enqueue_scripts', array( __CLASS__, 'remove_unused_styles' ), 999 );
         add_filter( 'body_class', array( __CLASS__, 'body_classes' ), 999 );
         add_filter( 'wp_img_tag_add_auto_sizes', array( __CLASS__, 'auto_sizes' ) );
@@ -29,8 +30,16 @@ class Frontend_Policy {
     public static function body_classes( $classes ) {
         if ( ! self::active( 'guard_clean_body_classes' ) ) { return $classes; }
         return array_values( array_filter( $classes, static function( $class ) {
-            return ! preg_match( '/^(?:wp-|page(?:-|$)|postid-|post-template|post-type-|type-|status-|tax-|term-|tag(?:-|$)|category(?:-|$)|paged(?:-|$)|page-template|single(?:-|$)|singular$|archive$|home$|blog$|logged-in$|admin-bar$|hfeed$|hentry$|customize-support$|theme-)/', $class );
+            return ! preg_match( '/^(?:wp-|page(?:-|$)|postid-|post-template|post-type-|type-|status-|tax-|term-|tag(?:-|$)|category(?:-|$)|paged(?:-|$)|page-template|single(?:-|$)|singular$|archive(?:-|$)|search(?:-|$)|error404$|home$|blog$|logged-in$|admin-bar$|hfeed$|hentry$|customize-support$|theme-)/', $class );
         } ) );
+    }
+    public static function export_context_token() {
+        return hash_hmac( 'sha256', 'gamb-static-export-context', wp_salt( 'nonce' ) );
+    }
+    public static function send_export_context() {
+        $provided = isset( $_SERVER['HTTP_X_GAMB_STATIC_EXPORT'] ) ? (string) $_SERVER['HTTP_X_GAMB_STATIC_EXPORT'] : '';
+        if ( '' === $provided || ! hash_equals( self::export_context_token(), $provided ) || headers_sent() ) { return; }
+        header( 'X-Gamb-Static-Context: front=' . ( is_front_page() ? '1' : '0' ) . ';error=' . ( is_404() ? '1' : '0' ) );
     }
     public static function auto_sizes( $value ) { return self::active( 'guard_remove_block_styles' ) ? false : $value; }
     public static function speculation( $value ) { return self::active( 'guard_disable_speculation' ) ? null : $value; }

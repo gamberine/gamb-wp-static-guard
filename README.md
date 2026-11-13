@@ -4,7 +4,7 @@
 
 Extensão para WordPress destinada à geração de sites estáticos, à publicação em diretório local ou arquivo ZIP e à redução da exposição de informações técnicas na saída pública.
 
-**Versão de referência:** 4.1.1. **Licença:** GPL-2.0-or-later. **Manutenção:** [gamberine](https://github.com/gamberine).
+**Versão de referência:** 4.1.2. **Licença:** GPL-2.0-or-later. **Manutenção:** [gamberine](https://github.com/gamberine).
 
 ## Finalidade e limites
 
@@ -49,6 +49,8 @@ A remoção de CSS nativo e de classes do corpo permanece desabilitada por padr�
 O painel apresenta caixas recolhíveis separadas para **STATIC/Conversão - HTML/ZIP** e **GUARD/Segurança - Blindado**. O escopo e o botão **Converter & Publicar Agora** permanecem em uma caixa independente.
 
 O gerenciador mantém somente as **seis cópias de segurança mais recentes**, somando todos os tipos. A retenção ocorre após a conclusão de uma nova cópia, sem remover arquivos de terceiros.
+
+A captura da raiz exige HTTP 200 e confirmação de que a origem está em contexto de página inicial, sem erro 404. A página de erro exige HTTP 404 real. Respostas incompatíveis interrompem a entrega e preservam a publicação anterior. O tema consumidor deve fornecer o conteúdo visual do documento de erro.
 
 ## Identificadores públicos
 
