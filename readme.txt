@@ -4,7 +4,7 @@ Tags: static-site, export, security, local-search
 Requires at least: 6.2
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 4.1.2
+Stable tag: 4.2.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/old-licenses/gpl-2.0.html
 
@@ -37,6 +37,11 @@ Repositório, documentação e versões:
 https://github.com/gamberine/gamb-wp-static-guard
 
 == Registro de versões ==
+
+= 4.2.0 =
+Diagnóstico de instalação, inventário de dependências, 404 de apoio, canonical
+da Home exportada e SRI dos recursos locais tokenizados finais. Bloqueio opcional
+de publicação com dependências externas identificadas ou inspeção incompleta.
 
 = 4.1.2 =
 Validação do status e do contexto WordPress da captura da Home e do documento

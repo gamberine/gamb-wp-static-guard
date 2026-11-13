@@ -21,3 +21,15 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - run: python3 scripts/build.py
       - run: git diff --check
+  html-api:
+    name: HTML API (WordPress ${{ matrix.wordpress }})
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        wordpress: ['6.2', 'latest']
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - run: python3 scripts/fetch-test-core.py '${{ matrix.wordpress }}'
+      - run: php tests/run.php
+        env:
+          GAMB_WP_HTML_API: tests/runtime/core-${{ matrix.wordpress }}/wordpress

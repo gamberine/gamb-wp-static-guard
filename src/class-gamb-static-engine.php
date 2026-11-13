@@ -139,6 +139,7 @@ class Static_Engine {
 		$exported_cnt = 0;
 		$page_failures = array();
 		$search_items = array();
+		$dependency_audit = new Installation_Checks();
 
 		// 1. Sempre registra e materializa os ativos do tema (CSS, JS, fontes, imagens do layout)
 		$guard->register_all_theme_assets_as_tokens();
@@ -168,8 +169,10 @@ class Static_Engine {
 				}
 
 				// Aplica camuflagem GUARD (tokenização /v/<token>, limpeza de comentários, sanitização DOM)
+				$html = Installation_Checks::complete_document( $html, untrailingslashit( $url ) === untrailingslashit( home_url( '/' ) ), '404.html' === $rel_file );
 				$processed_html = Frontend_Policy::postprocess_html( $guard->cloak_html_content( $html ) );
 				$guard->register_tokens_in_content( $processed_html );
+				$dependency_audit->inspect_html( $processed_html, $url );
 
 				// Aplica substituição de URLs conforme modo selecionado (relative, absolute, offline)
 				$processed_html = $this->apply_url_replacement_mode( $processed_html, $rel_file );
@@ -211,6 +214,18 @@ class Static_Engine {
 			return array( 'success' => false, 'message' => 'Falha ao obter páginas; consulte o registro.', 'failed_urls' => $page_failures );
 		}
 
+		$dependency_report = $dependency_audit->dependency_report();
+		if ( 'theme' !== $scope ) {
+			$dependency_report['checked_at'] = current_time( 'mysql' );
+			update_option( Installation_Checks::EXPORT_OPTION, $dependency_report, false );
+			if ( ! empty( $dependency_report['dependencies'] ) || $dependency_report['limited'] ) {
+				self::log_activity( sprintf( 'Inspeção da publicação: %d dependência(s) externa(s). Consulte o diagnóstico de instalação.', count( $dependency_report['dependencies'] ) ) );
+				if ( $opts->get( 'require_local_dependencies', false ) ) {
+					return array( 'success' => false, 'message' => 'A publicação exige recursos locais. Há dependências externas ou a inspeção atingiu seu limite; consulte o diagnóstico. O destino foi preservado.' );
+				}
+			}
+		}
+
 		if ( $opts->get( 'use_search', true ) && 'theme' !== $scope ) {
 			wp_mkdir_p( $archive_dir . 'static' );
 			copy( GAMB_STATIC_WP_PATH . 'assets/static-search.js', $archive_dir . 'static/search.js' );
@@ -218,6 +233,7 @@ class Static_Engine {
 		// 3. Materializa todos os tokens criptografados (/v/<token> e /v/d/<token>/) no diretório estático
 		$tokens_cnt   = $guard->materialize_cloaked_assets_in_archive( $archive_dir );
 		$exported_cnt += $tokens_cnt;
+		Installation_Checks::finalize_integrity( $archive_dir );
 
 		// 4. Escreve arquivos de blindagem de servidor (.htaccess e _headers) na raiz da exportação
 		$this->write_export_file( $archive_dir . ".htaccess", Gamb_Security_Suite::get_htaccess_content() );
@@ -268,6 +284,7 @@ class Static_Engine {
 			"download_url"    => isset( $deploy_result["download_url"] ) ? $deploy_result["download_url"] : "",
 			"zip_size"        => isset( $deploy_result["size_formatted"] ) ? $deploy_result["size_formatted"] : "",
 			"messages"        => $opts->get( "archive_status_messages", array() ),
+			'dependency_warnings' => count( $dependency_report['dependencies'] ),
 		);
 	}
 

@@ -7,7 +7,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 /**
- * Gamb WP Static Guard - Gerenciador Central de Opções e Perfil Padrão Seguro (v4.1.2).
+ * Gamb WP Static Guard - Gerenciador Central de Opções e Perfil Padrão Seguro (v4.2.0).
  *
  * Mantém compatibilidade com a chave 'gamb-wp-static-guard' no wp_options e separa claramente
  * as configurações de 1. STATIC (Conversão & Publicação) e 2. GUARD (Ocultação & Segurança).
@@ -16,7 +16,7 @@ class Options {
 
 	const OPTION_KEY  = 'gamb_wp_static_guard';
 	const VERSION_KEY = 'gamb_wp_static_guard_profile_version';
-	const VERSION     = '4.1.2';
+	const VERSION     = '4.2.0';
 
 	private static $instance = null;
 	private $options = array();
@@ -78,6 +78,10 @@ class Options {
 			'post_types'                       => $post_types_default,
 			'generate_404'                     => true,
 			'custom_404_page'                  => 0,
+			'fallback_404'                     => true,
+			'ensure_home_canonical'            => true,
+			'refresh_local_integrity'          => true,
+			'require_local_dependencies'       => false,
 			'add_feeds'                        => false,
 			'add_rest_api'                     => false,
 			'additional_urls'                  => '',
@@ -231,6 +235,12 @@ class Options {
 
 	public function save() {
 		update_option( self::OPTION_KEY, $this->options );
+		return $this;
+	}
+
+	/** Atualiza somente a identificação da distribuição, sem reaplicar o perfil. */
+	public function synchronize_version() {
+		if ( $this->get( 'version' ) !== self::VERSION ) { $this->set( 'version', self::VERSION )->save(); }
 		return $this;
 	}
 

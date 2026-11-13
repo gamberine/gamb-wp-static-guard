@@ -22,6 +22,20 @@
     if (!root) return;
     var notice = root.querySelector('#gamb-toast');
     function notify(message, error) { notice.textContent = message; notice.hidden = false; notice.classList.toggle('gamb-error', !!error); }
+    function showDiagnostics(result) {
+      var installation = result.installation || {}, resources = result.publication && result.publication.dependencies ? result.publication : installation.resources || {};
+      root.querySelector('[data-diagnostics-time]').textContent = installation.checked_at || 'Não realizada';
+      var list = root.querySelector('[data-installation-checks]'); list.replaceChildren();
+      (installation.checks || []).forEach(function (check) { var item = document.createElement('li'); item.textContent = ({ok:'Verificado',warning:'Atenção',error:'Impedimento'}[check.status] || 'Informação') + ': ' + check.message; list.appendChild(item); });
+      root.querySelector('[data-dependency-summary]').textContent = (resources.dependencies || []).length + ' dependência(s); ' + (resources.external_navigation_count || 0) + ' link(s) externo(s) de navegação. ' + (resources.limited ? 'Limite de inspeção atingido. ' : '') + (resources.scope || '');
+      list = root.querySelector('[data-dependency-list]'); list.replaceChildren();
+      (resources.dependencies || []).forEach(function (dependency) { var item = document.createElement('li'); item.textContent = dependency.kind + ': ' + dependency.url; list.appendChild(item); });
+    }
+    var diagnosticsButton = root.querySelector('[data-run-diagnostics]');
+    diagnosticsButton.addEventListener('click', function () {
+      diagnosticsButton.disabled = true; notify('Verificação da origem em andamento.');
+      request('diagnostics', {}).then(function (result) { showDiagnostics(result); notify('Diagnóstico atualizado.'); }).catch(function (error) { notify(error.message, true); }).finally(function () { diagnosticsButton.disabled = false; });
+    });
     function loadBackups() {
       var container = root.querySelector('[data-backup-list]');
       return request('backups').then(function (backups) {
@@ -46,6 +60,7 @@
         root.querySelectorAll('[data-tab]').forEach(function (item) { item.setAttribute('aria-pressed', String(item === button)); });
         root.querySelectorAll('.gamb-panel').forEach(function (panel) { panel.hidden = panel.id !== button.getAttribute('aria-controls'); });
         if (button.dataset.tab === 'backup') loadBackups();
+        if (button.dataset.tab === 'diagnostics') request('diagnostics').then(showDiagnostics).catch(function (error) { notify(error.message, true); });
       });
     });
     root.querySelectorAll('.gamb-save-settings-btn').forEach(function (button) {
@@ -61,7 +76,7 @@
       button.addEventListener('click', function () {
         button.disabled = true; notify('Publicação em andamento. Aguarde a conclusão.');
         request('start-export', {type:root.querySelector('#gamb-quick-scope').value}).then(function (result) {
-          notify('Publicação concluída. Arquivos processados: ' + result.files_count + '.');
+          notify('Publicação concluída. Arquivos processados: ' + result.files_count + '.' + (result.dependency_warnings ? ' Há dependências externas; consulte o diagnóstico.' : ''));
           root.querySelector('#stat-last-time').textContent = result.exported_at;
           root.querySelector('#stat-last-scope').textContent = result.scope_label;
           root.querySelector('#stat-last-count').textContent = result.files_count;
