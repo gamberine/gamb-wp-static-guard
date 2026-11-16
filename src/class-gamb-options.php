@@ -1,4 +1,5 @@
 <?php
+declare(strict_types=1);
 
 namespace GambWPStaticGuard;
 
@@ -7,7 +8,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 /**
- * Gamb WP Static Guard - Gerenciador Central de Opções e Perfil Padrão Seguro (v4.2.0).
+ * Gamb WP Static Guard - Gerenciador Central de Opções e Perfil Padrão Seguro (v5.0.0).
  *
  * Mantém compatibilidade com a chave 'gamb-wp-static-guard' no wp_options e separa claramente
  * as configurações de 1. STATIC (Conversão & Publicação) e 2. GUARD (Ocultação & Segurança).
@@ -16,7 +17,7 @@ class Options {
 
 	const OPTION_KEY  = 'gamb_wp_static_guard';
 	const VERSION_KEY = 'gamb_wp_static_guard_profile_version';
-	const VERSION     = '4.2.0';
+	const VERSION     = '5.0.0';
 
 	private static $instance = null;
 	private $options = array();
@@ -141,6 +142,9 @@ class Options {
 			'guard_strip_asset_versions' => true,
 			'guard_disable_speculation' => true,
 			'guard_strict_static_html' => true,
+			'sanitizer_style_whitelist' => '',
+			'audit_unresolved_shortcodes' => '',
+			'github_update_repository' => 'gamberine/gamb-wp-static-guard',
 			'guard_active_on_live_site'        => true, // Ativa ocultação dinâmica também no site WP ao vivo
 			'guard_universal_token_cloaking'   => true, // Criptografa CSS, JS, fontes e imagens em /v/<token> sem extensão
 			'guard_encrypt_image_paths'        => true, // Oculta caminho completo e nome original das imagens

@@ -10,7 +10,7 @@ output = root / "dist"
 output.mkdir(exist_ok=True)
 package = output / f"gamb-wp-static-guard-{version}.zip"
 paths = [root / name for name in ("gamb-wp-static-guard.php", "index.php", "readme.txt", "LICENSE")]
-for directory in ("src", "assets"):
+for directory in ("src", "assets", "bin"):
     paths.extend(p for p in (root / directory).rglob("*") if p.is_file())
 with zipfile.ZipFile(package, "w", zipfile.ZIP_DEFLATED, compresslevel=9) as archive:
     for path in sorted(paths):

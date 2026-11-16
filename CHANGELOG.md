@@ -2,6 +2,18 @@
 
 Este documento distingue a incorporação histórica das novas alterações. As datas correspondem ao registro verificável, sem reconstruir datas de commits inexistentes.
 
+## 5.0.0 - 2026-11-16
+
+- Requerer PHP 8.1 e adotar strict_types em todos os arquivos PHP distribuídos.
+- Introduzir parser HTML5 no PHP 8.4 e alternativa DOMDocument com mb_encode_numericentity, preservando Unicode em scripts e estilos.
+- Auditar buffer original e pacote final contra vazamentos, código bruto, credenciais, shortcodes configurados e contexto 404 acidental na Home.
+- Sanitizar padrões de classes, estilos, variáveis nativas, comentários, regras especulativas e pontuação textual, com whitelist explícita de estilos.
+- Calcular SRI externo HTTPS com cache de sete dias, preconnect, noopener, noreferrer e defer local.
+- Restringir display_errors no escopo de captura e registrar avisos sem mensagens potencialmente sensíveis.
+- Integrar GitHub Releases ao atualizador nativo, com cache de doze horas, modal de versão, token AES-256-GCM ou constante e download validado sem vazamento do PAT nos redirecionamentos.
+- Normalizar diretório extraído, invalidar SRI e agendar revalidação após atualizações.
+- Distribuir bin/audit-static.php e ampliar a matriz PHP 8.1, 8.2, 8.3 e 8.4.
+
 ## 4.2.0 - 2026-11-13
 
 - Extrair as correções reutilizáveis do consumidor e documentar a matriz de portabilidade e os limites de automação.

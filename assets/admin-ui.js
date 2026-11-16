@@ -22,6 +22,16 @@
     if (!root) return;
     var notice = root.querySelector('#gamb-toast');
     function notify(message, error) { notice.textContent = message; notice.hidden = false; notice.classList.toggle('gamb-error', !!error); }
+    function showSecurity(result) {
+      root.querySelector('[data-update-status]').textContent = 'Instalada: ' + result.installed + '. GitHub: ' + (result.latest || 'consulta indisponível') + '. ' + (result.update_available ? 'Atualização disponível no WordPress.' : '') + ' Token: ' + (result.token_configured ? 'configurado' : 'não configurado') + '.';
+      var audit = result.audit || {}, list = root.querySelector('[data-audit-findings]'); list.replaceChildren();
+      root.querySelector('[data-audit-status]').textContent = result.audit_pending ? 'Revalidação agendada após atualização.' : audit.checked_at ? 'Auditoria: ' + audit.checked_at + '. ' + (audit.success ? 'Aprovada.' : 'Impedimentos encontrados.') : 'Auditoria ainda não realizada.';
+      (audit.findings || []).forEach(function (finding) { var item = document.createElement('li'); item.textContent = finding.severity + ': ' + finding.code + ' (' + finding.source + ')'; list.appendChild(item); });
+    }
+    [['[data-check-updates]', 'check-updates'], ['[data-run-audit]', 'audit']].forEach(function (operation) {
+      var button = root.querySelector(operation[0]);
+      button.addEventListener('click', function () { button.disabled = true; notify('Verificação em andamento.'); request(operation[1], {}).then(function (result) { showSecurity(result); notify('Verificação concluída.'); }).catch(function (error) { notify(error.message, true); }).finally(function () { button.disabled = false; }); });
+    });
     function showDiagnostics(result) {
       var installation = result.installation || {}, resources = result.publication && result.publication.dependencies ? result.publication : installation.resources || {};
       root.querySelector('[data-diagnostics-time]').textContent = installation.checked_at || 'Não realizada';
@@ -61,6 +71,7 @@
         root.querySelectorAll('.gamb-panel').forEach(function (panel) { panel.hidden = panel.id !== button.getAttribute('aria-controls'); });
         if (button.dataset.tab === 'backup') loadBackups();
         if (button.dataset.tab === 'diagnostics') request('diagnostics').then(showDiagnostics).catch(function (error) { notify(error.message, true); });
+        if (button.dataset.tab === 'updates') request('security-status').then(showSecurity).catch(function (error) { notify(error.message, true); });
       });
     });
     root.querySelectorAll('.gamb-save-settings-btn').forEach(function (button) {
@@ -69,7 +80,7 @@
         root.querySelectorAll('[data-opt]').forEach(function (field) { payload[field.dataset.opt] = field.type === 'checkbox' ? field.checked : field.value; });
         payload.post_types = Array.from(root.querySelectorAll('.gamb-pt-checkbox:checked')).map(function (field) { return field.value; });
         button.disabled = true;
-        request('settings', payload).then(function () { notify('Configurações salvas.'); }).catch(function (error) { notify(error.message, true); }).finally(function () { button.disabled = false; });
+        request('settings', payload).then(function () { root.querySelector('[data-opt=github_update_token]').value = ''; root.querySelector('[data-opt=github_clear_token]').checked = false; notify('Configurações salvas.'); }).catch(function (error) { notify(error.message, true); }).finally(function () { button.disabled = false; });
       });
     });
     root.querySelectorAll('.gamb-run-export-btn').forEach(function (button) {

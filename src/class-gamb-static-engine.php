@@ -1,4 +1,5 @@
 <?php
+declare(strict_types=1);
 
 namespace GambWPStaticGuard;
 
@@ -72,8 +73,10 @@ class Static_Engine {
 		try {
 			return $this->perform_export( $scope, $post_id );
 		} catch ( \Throwable $error ) {
-			self::log_activity( 'Exportação falhou: ' . $error->getMessage() );
-			return array( 'success' => false, 'message' => $error->getMessage() );
+			Gamb_Static_Auditor::processing_failure();
+			$message = str_starts_with( $error->getMessage(), 'CRITICAL:' ) ? $error->getMessage() : 'CRITICAL: falha no processamento da publicação. Consulte a auditoria. O destino foi preservado.';
+			self::log_activity( $message );
+			return array( 'success' => false, 'message' => $message );
 		} finally {
 			flock( $lock, LOCK_UN );
 			fclose( $lock );
@@ -85,6 +88,7 @@ class Static_Engine {
 	}
 
 	private function perform_export( $scope, $post_id ) {
+		Gamb_Static_Auditor::begin();
 		$opts = Options::instance();
 		if ( "" === $scope ) {
 			$scope = (string) $opts->get( "generate_type", "theme" );
@@ -161,6 +165,7 @@ class Static_Engine {
 				$rel_file = $url_info["rel_file"];
 				$html     = $this->fetch_local_url_html( $url, '404.html' === $rel_file );
 				if ( "" === trim( $html, "\xEF\xBB\xBF \t\r\n" ) ) {
+					Gamb_Static_Auditor::capture_failure( $url );
 					$page_failures[] = $url;
 					continue;
 				}
@@ -169,6 +174,7 @@ class Static_Engine {
 				}
 
 				// Aplica camuflagem GUARD (tokenização /v/<token>, limpeza de comentários, sanitização DOM)
+				Gamb_Static_Auditor::assert_safe( $html, $url, untrailingslashit( $url ) === untrailingslashit( home_url( '/' ) ) );
 				$html = Installation_Checks::complete_document( $html, untrailingslashit( $url ) === untrailingslashit( home_url( '/' ) ), '404.html' === $rel_file );
 				$processed_html = Frontend_Policy::postprocess_html( $guard->cloak_html_content( $html ) );
 				$guard->register_tokens_in_content( $processed_html );
@@ -195,6 +201,7 @@ class Static_Engine {
 				}
 
 				$dest_file = $archive_dir . ltrim( $rel_file, "/\\" );
+				Gamb_Static_Auditor::assert_safe( $processed_html, $url, 'index.html' === $rel_file, true );
 				@wp_mkdir_p( dirname( $dest_file ) );
 				$this->write_export_file( $dest_file, $processed_html );
 				$exported_cnt++;
@@ -234,6 +241,7 @@ class Static_Engine {
 		$tokens_cnt   = $guard->materialize_cloaked_assets_in_archive( $archive_dir );
 		$exported_cnt += $tokens_cnt;
 		Installation_Checks::finalize_integrity( $archive_dir );
+		Gamb_Static_Auditor::audit_directory( $archive_dir );
 
 		// 4. Escreve arquivos de blindagem de servidor (.htaccess e _headers) na raiz da exportação
 		$this->write_export_file( $archive_dir . ".htaccess", Gamb_Security_Suite::get_htaccess_content() );
@@ -456,7 +464,9 @@ class Static_Engine {
 	}
 
 	private function fetch_local_url_html( $url, $expected_404 = false ) {
-		$resp = wp_remote_get(
+		$previous_display_errors = ini_get( 'display_errors' );
+		ini_set( 'display_errors', '0' );
+		try { $resp = wp_remote_get(
 			$url,
 			array(
 				"timeout"   => 25,
@@ -466,7 +476,7 @@ class Static_Engine {
 					'X-Gamb-Static-Export' => Frontend_Policy::export_context_token(),
 				),
 			)
-		);
+		); } finally { ini_set( 'display_errors', (string) $previous_display_errors ); }
 		if ( is_wp_error( $resp ) ) {
 			self::log_activity( 'Falha ao buscar ' . $url . ': ' . $resp->get_error_message() );
 			return '';

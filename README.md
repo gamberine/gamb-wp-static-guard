@@ -4,9 +4,11 @@
 
 Extensão para WordPress destinada à geração de sites estáticos, à publicação em diretório local ou arquivo ZIP e à redução da exposição de informações técnicas na saída pública.
 
-**Versão de referência:** 4.2.0. **Licença:** GPL-2.0-or-later. **Manutenção:** [gamberine](https://github.com/gamberine).
+**Versão de referência:** 5.0.0. **Licença:** GPL-2.0-or-later. **Manutenção:** [gamberine](https://github.com/gamberine).
 
 ## Finalidade e limites
+
+A versão 5 requer PHP 8.1 ou superior. No PHP 8.1 a 8.3, as extensões DOM e mbstring são necessárias para o parser; no PHP 8.4 ou superior, o parser HTML5 nativo é utilizado quando disponível. A validação automatizada cobre PHP 8.1, 8.2, 8.3 e 8.4, sem presumir compatibilidade irrestrita com futuras versões. Consulte a [arquitetura de segurança e atualização](docs/SECURITY-ARCHITECTURE.md) antes da migração.
 
 O componente **Static** consulta páginas públicas, reúne recursos e produz HTML, CSS, JavaScript, documentos e um índice de pesquisa local. O componente **Guard** reescreve caminhos de recursos, aplica controles configuráveis à saída e valida o HTML antes da entrega.
 
@@ -23,6 +25,10 @@ Endereços opacos não constituem controle de acesso. Arquivos publicados perman
 - Controles opcionais para estilos nativos, classes do corpo, versões de recursos e pré-carregamento especulativo.
 - Diagnóstico inicial, inventário de dependências externas e requisito opcional de recursos locais antes da entrega.
 - Página 404 de apoio para temas clássicos sem modelo próprio, canonical ausente da Home e SRI dos recursos tokenizados finais.
+- Gate CRITICAL antes da sanitização e antes da entrega, com relatório administrativo e auditoria por CLI.
+- Sanitização final por padrões, whitelist de estilos e verificação de shortcodes não resolvidos.
+- SRI remoto HTTPS com cache, preconnect, proteção de links e defer de scripts locais.
+- Atualizações pelo GitHub Releases integradas aos controles nativos do WordPress e revalidação após atualizações.
 - Cópias administrativas do banco ou do banco com tema e extensões. O segundo pacote requer a extensão ZIP e não abrange uploads nem toda a instalação.
 
 ## Instalação
@@ -36,6 +42,10 @@ Endereços opacos não constituem controle de acesso. Arquivos publicados perman
 
 O pacote contém uma única pasta `gamb-wp-static-guard`. Não inclui banco de dados, credenciais, uploads ou tema de qualquer instalação.
 
+A primeira instalação da versão 5 utiliza o ZIP. As releases subsequentes aparecem nos controles de atualização do WordPress. O painel **Atualizações e auditoria** permite verificar novas versões e revalidar a origem. O WordPress controla a instalação e a habilitação das atualizações automáticas.
+
+O repositório padrão é `gamberine/gamb-wp-static-guard`, configurável no painel ou por `GAMB_GITHUB_REPOSITORY`. Repositórios privados admitem `GAMB_GITHUB_TOKEN` ou token salvo com AES-256-GCM. O valor não é devolvido à interface. Alteração dos salts exige cadastrar novamente o token criptografado.
+
 ## Configuração operacional
 
 Na primeira publicação, o servidor exige **Site Completo (Full Site)** e libera os demais escopos somente após a entrega bem-sucedida.
@@ -46,7 +56,7 @@ A pasta local deve existir, permitir gravação e ser dedicada à publicação. 
 
 O caminho público deve corresponder à localização da publicação: vazio para a raiz do domínio ou, por exemplo, `/portal` para uma subpasta. Alterações em menus, opções globais ou templates exigem nova publicação quando não houver um adaptador específico de agendamento.
 
-A remoção de CSS nativo e de classes do corpo permanece desabilitada por padrão. Esses controles devem ser habilitados somente depois de verificar que o tema não depende deles. A minificação adicional também permanece desabilitada por padrão.
+Os controles opcionais de limpeza de classes e CSS na origem permanecem desabilitados por padrão. A exportação da versão 5 aplica sanitização por padrões independentemente desses controles, com whitelist explícita de estilos. Temas que dependem de identificadores ou estilos nativos exigem homologação. A minificação adicional permanece desabilitada por padrão.
 
 O painel apresenta caixas recolhíveis separadas para **STATIC/Conversão - HTML/ZIP** e **GUARD/Segurança - Blindado**. O escopo e o botão **Converter & Publicar Agora** permanecem em uma caixa independente.
 
@@ -77,7 +87,7 @@ Integrações PHP devem adotar o namespace e os nomes de opções atuais. Endpoi
 
 ## Desenvolvimento e verificação
 
-Requisitos declarados: WordPress 6.2 ou superior e PHP 7.4 ou superior. A validação local da versão 4 foi executada com WordPress 7.1.4 e PHP 8.3.26. A integração contínua verifica versões PHP adicionais; seu resultado deve ser consultado em [Actions](https://github.com/gamberine/gamb-wp-static-guard/actions).
+Requisitos declarados: WordPress 6.2 ou superior e PHP 8.1 ou superior. A validação local da versão 4 foi executada com WordPress 7.1.4 e PHP 8.3.26. A integração contínua verifica versões PHP adicionais; seu resultado deve ser consultado em [Actions](https://github.com/gamberine/gamb-wp-static-guard/actions).
 
 ```sh
 php tests/run.php

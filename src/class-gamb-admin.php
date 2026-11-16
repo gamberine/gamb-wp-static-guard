@@ -1,4 +1,5 @@
 <?php
+declare(strict_types=1);
 namespace GambWPStaticGuard;
 if ( ! defined( 'ABSPATH' ) ) { exit; }
 
@@ -44,6 +45,9 @@ class Admin_Controller {
             '/settings' => array( array( 'methods' => 'GET', 'callback' => array( $this, 'rest_get_settings' ) ), array( 'methods' => 'POST', 'callback' => array( $this, 'rest_save_settings' ) ) ),
             '/start-export' => array( 'methods' => 'POST', 'callback' => array( $this, 'rest_start_export' ) ),
             '/diagnostics' => array( array( 'methods' => 'GET', 'callback' => array( $this, 'rest_get_diagnostics' ) ), array( 'methods' => 'POST', 'callback' => array( $this, 'rest_run_diagnostics' ) ) ),
+            '/security-status' => array( 'methods' => 'GET', 'callback' => array( $this, 'rest_security_status' ) ),
+            '/check-updates' => array( 'methods' => 'POST', 'callback' => array( $this, 'rest_check_updates' ) ),
+            '/audit' => array( 'methods' => 'POST', 'callback' => array( $this, 'rest_audit' ) ),
             '/apply-single' => array( 'methods' => 'POST', 'callback' => array( $this, 'rest_apply_single' ) ),
             '/backups' => array( 'methods' => 'GET', 'callback' => static function() { return rest_ensure_response( Backup_Service::list_backups() ); } ),
             '/backup' => array( 'methods' => 'POST', 'callback' => array( $this, 'rest_create_backup' ) ),
@@ -58,15 +62,40 @@ class Admin_Controller {
     public function rest_get_settings() { return rest_ensure_response( array_intersect_key( Options::instance()->get_all(), Options::get_default_options() ) ); }
     public function rest_get_diagnostics() { return rest_ensure_response( array( 'installation' => Installation_Checks::latest(), 'publication' => get_option( Installation_Checks::EXPORT_OPTION, array() ) ) ); }
     public function rest_run_diagnostics() { Installation_Checks::run(); return $this->rest_get_diagnostics(); }
+    public function rest_security_status() {
+        $updater = Gamb_GitHub_Updater::instance(); $release = $updater->latest();
+        return rest_ensure_response( array( 'installed' => GAMB_STATIC_WP_VERSION, 'latest' => $release['version'] ?? null, 'update_available' => $release && version_compare( $release['version'], GAMB_STATIC_WP_VERSION, '>' ), 'token_configured' => '' !== $updater->token(), 'audit' => get_option( Gamb_Static_Auditor::REPORT_OPTION, array() ), 'audit_pending' => (bool) get_option( Gamb_Static_Auditor::PENDING_OPTION, false ) ) );
+    }
+    public function rest_check_updates() {
+        if ( ! current_user_can( 'update_plugins' ) ) { return new \WP_Error( 'forbidden', 'A verificação requer permissão para atualizar plugins.', array( 'status' => 403 ) ); }
+        $updater = Gamb_GitHub_Updater::instance();
+        try { $updater->repository(); } catch ( \RuntimeException $error ) { return new \WP_Error( 'invalid_repository', 'Configure o repositório GitHub no formato owner/repo.', array( 'status' => 400 ) ); }
+        $updater->clear_cache(); $release = $updater->latest( true );
+        if ( ! $release ) { return new \WP_Error( 'github_unavailable', 'Não foi possível consultar uma release estável. Verifique repositório, token, conectividade e limite da API.', array( 'status' => 422 ) ); }
+        wp_update_plugins();
+        return $this->rest_security_status();
+    }
+    public function rest_audit() { Gamb_Static_Auditor::revalidate(); return $this->rest_security_status(); }
     public function rest_save_settings( $request ) {
         $options = Options::instance(); $defaults = Options::get_default_options();
         $params = $request->get_params();
+        if ( isset( $params['github_update_repository'] ) && ( ! is_string( $params['github_update_repository'] ) || ! Gamb_GitHub_Updater::valid_repository( $params['github_update_repository'] ) ) ) { return new \WP_Error( 'invalid_repository', 'Informe owner/repo para o GitHub.', array( 'status' => 400 ) ); }
+        if ( isset( $params['github_update_repository'] ) && $params['github_update_repository'] !== $options->get( 'github_update_repository' ) && ! current_user_can( 'update_plugins' ) ) { return new \WP_Error( 'forbidden', 'A configuração requer permissão para atualizar plugins.', array( 'status' => 403 ) ); }
+        $new_token = $params['github_update_token'] ?? ''; $clear_token = ! empty( $params['github_clear_token'] );
+        if ( ! is_string( $new_token ) ) { return new \WP_Error( 'invalid_token', 'Token GitHub inválido.', array( 'status' => 400 ) ); }
+        if ( '' !== $new_token || $clear_token ) {
+            if ( ! current_user_can( 'update_plugins' ) || defined( 'GAMB_GITHUB_TOKEN' ) ) { return new \WP_Error( 'token_permission', 'O token exige permissão de atualização e não pode substituir uma constante de configuração.', array( 'status' => 403 ) ); }
+        }
         if ( isset( $params['post_types'] ) && empty( $params['post_types'] ) ) { return new \WP_Error( 'missing_types', 'Selecione ao menos um tipo de conteúdo.', array( 'status' => 400 ) ); }
         if ( isset( $params['destination_scheme'] ) && ! in_array( $params['destination_scheme'], array( 'https://', 'http://' ), true ) ) { return new \WP_Error( 'invalid_scheme', 'Protocolo de publicação inválido.', array( 'status' => 400 ) ); }
         foreach ( array( 'relative_path', 'destination_host' ) as $path_key ) {
             if ( isset( $params[$path_key] ) && ( ! is_string( $params[$path_key] ) || preg_match( '~[\x00-\x20<>"\x27`?#]~', $params[$path_key] ) ) ) { return new \WP_Error( 'invalid_url_path', 'Informe um domínio ou caminho público sem espaços ou caracteres de marcação.', array( 'status' => 400 ) ); }
         }
         if ( isset( $params['delivery_method'] ) && ! in_array( $params['delivery_method'], array( 'local', 'zip' ), true ) ) { return new \WP_Error( 'invalid_delivery', 'Selecione entrega local ou arquivo ZIP.', array( 'status' => 400 ) ); }
+        if ( '' !== $new_token || $clear_token ) {
+            Gamb_GitHub_Updater::instance()->clear_cache();
+            if ( ! Gamb_GitHub_Updater::instance()->set_token( $clear_token ? '' : $new_token ) ) { return new \WP_Error( 'token_encryption', 'Não foi possível criptografar o token. Verifique OpenSSL e o formato informado.', array( 'status' => 400 ) ); }
+        }
         foreach ( $params as $key => $value ) {
             if ( ! array_key_exists( $key, $defaults ) || strpos( $key, 'last_' ) === 0 || in_array( $key, array( 'archive_status_messages', 'version', 'first_full_export_completed' ), true ) ) { continue; }
             if ( is_bool( $defaults[$key] ) ) { $value = filter_var( $value, FILTER_VALIDATE_BOOLEAN ); }
@@ -76,6 +105,7 @@ class Admin_Controller {
             else { continue; }
             $options->set( $key, $value );
         }
+        Gamb_GitHub_Updater::instance()->clear_cache();
         $options->save(); Gamb_Security_Suite::purge_page_caches();
         return rest_ensure_response( array( 'success' => true ) );
     }
@@ -99,7 +129,7 @@ class Admin_Controller {
             <div class="gamb-layout">
             <aside class="gamb-sidebar" aria-label="Publicação e segurança">
                 <details class="gamb-sidebox" name="gamb-sections" open><summary>1. STATIC/Conversão - HTML/ZIP</summary><nav class="gamb-admin-nav" aria-label="Conversão estática"><button type="button" class="button" data-tab="publication" aria-controls="panel-publication" aria-pressed="true">Publicação e registro</button><button type="button" class="button" data-tab="diagnostics" aria-controls="panel-diagnostics" aria-pressed="false">Diagnóstico da instalação</button><button type="button" class="button" data-tab="settings" aria-controls="panel-settings" aria-pressed="false">Configuração da conversão</button></nav></details>
-                <details class="gamb-sidebox" name="gamb-sections"><summary>2. GUARD/Segurança - Blindado</summary><nav class="gamb-admin-nav" aria-label="Controles de segurança"><button type="button" class="button" data-tab="guard" aria-controls="panel-guard" aria-pressed="false">Controles de exposição</button><button type="button" class="button" data-tab="backup" aria-controls="panel-backup" aria-pressed="false">Gerenciador de backups</button></nav></details>
+                <details class="gamb-sidebox" name="gamb-sections"><summary>2. GUARD/Segurança - Blindado</summary><nav class="gamb-admin-nav" aria-label="Controles de segurança"><button type="button" class="button" data-tab="guard" aria-controls="panel-guard" aria-pressed="false">Controles de exposição</button><button type="button" class="button" data-tab="updates" aria-controls="panel-updates" aria-pressed="false">Atualizações e auditoria</button><button type="button" class="button" data-tab="backup" aria-controls="panel-backup" aria-pressed="false">Gerenciador de backups</button></nav></details>
                 <section class="gamb-sidebox gamb-scope-box" aria-labelledby="gamb-scope-heading">
                     <h2 id="gamb-scope-heading">Selecione o Escopo de Conversão</h2>
                     <label class="screen-reader-text" for="gamb-quick-scope">Escopo de conversão</label>
@@ -143,10 +173,29 @@ class Admin_Controller {
                 <button type="button" class="button button-primary gamb-save-settings-btn">Salvar configurações</button>
             </section>
             <section class="gamb-panel" id="panel-guard" hidden><h2>Controles de exposição</h2><p>Os recursos publicados continuam públicos. Endereços opacos reduzem a identificação de caminhos; não substituem autenticação, autorização ou análise de segurança.</p>
-                <?php foreach ( array( 'guard_active_on_live_site' => 'Aplicar tratamento também nas páginas públicas da origem', 'guard_universal_token_cloaking' => 'Reescrever recursos para endereços opacos', 'guard_strip_asset_versions' => 'Remover parâmetros de versão dos recursos públicos', 'guard_disable_speculation' => 'Desabilitar regras de pré-carregamento especulativo', 'guard_strict_static_html' => 'Interromper entrega com referências internas não resolvidas', 'guard_clean_body_classes' => 'Remover classes nativas do corpo, após validar a dependência do tema', 'guard_remove_block_styles' => 'Remover estilos nativos de blocos, somente se o tema não os utilizar', 'guard_disable_texturize' => 'Desabilitar substituições tipográficas automáticas', 'hide_comments' => 'Remover comentários HTML na saída pública', 'guard_security_headers' => 'Aplicar cabeçalhos de segurança', 'guard_restrict_rest_api' => 'Restringir consulta anônima aos recursos administrativos da API' ) as $key => $label ) { $this->checkbox( $key, $label, $options ); } ?>
+                <?php foreach ( array( 'guard_active_on_live_site' => 'Aplicar tratamento também nas páginas públicas da origem', 'guard_universal_token_cloaking' => 'Reescrever recursos para endereços opacos', 'guard_strict_static_html' => 'Interromper entrega com referências internas não resolvidas', 'guard_clean_body_classes' => 'Remover classes nativas do corpo, após validar a dependência do tema', 'guard_remove_block_styles' => 'Remover estilos nativos de blocos, somente se o tema não os utilizar', 'hide_comments' => 'Remover comentários HTML na saída pública', 'guard_security_headers' => 'Aplicar cabeçalhos de segurança', 'guard_restrict_rest_api' => 'Restringir consulta anônima aos recursos administrativos da API' ) as $key => $label ) { $this->checkbox( $key, $label, $options ); } ?>
                 <button type="button" class="button button-primary gamb-save-settings-btn">Salvar configurações</button>
             </section>
             <section class="gamb-panel" id="panel-backup" hidden><h2>Gerenciador de backups</h2><p>São mantidas somente as seis cópias de segurança mais recentes, considerando todos os tipos. A retenção é aplicada após a conclusão de uma nova cópia.</p><p>O pacote de banco, tema e extensões não inclui uploads nem a instalação completa. A restauração é manual.</p><button type="button" class="button gamb-create-backup-btn" data-backup-type="db">Gerar cópia do banco</button> <button type="button" class="button gamb-create-backup-btn" data-backup-type="full">Gerar banco, tema e extensões</button><div class="gamb-backup-list" data-backup-list></div></section>
+            <section class="gamb-panel" id="panel-updates" hidden aria-labelledby="gamb-updates-heading">
+                <h2 id="gamb-updates-heading">Atualizações e auditoria</h2>
+                <p>As versões são consultadas no GitHub Releases. A instalação e a ativação das atualizações automáticas utilizam os controles nativos do WordPress.</p>
+                <p data-update-status role="status" aria-live="polite">Versão instalada: <?php echo esc_html( GAMB_STATIC_WP_VERSION ); ?>.</p>
+                <button type="button" class="button" data-check-updates>Verificar atualizações agora</button>
+                <a class="button" href="<?php echo esc_url( admin_url( 'plugins.php' ) ); ?>">Gerenciar atualizações no WordPress</a>
+                <?php $this->input( 'github_update_repository', 'Repositório GitHub no formato owner/repo', $options ); ?>
+                <label class="gamb-field" for="gamb-github-token">Token opcional para repositório privado</label>
+                <input class="regular-text" type="password" id="gamb-github-token" data-opt="github_update_token" value="" autocomplete="new-password" <?php disabled( defined( 'GAMB_GITHUB_TOKEN' ) ); ?>>
+                <p>O campo vazio preserva o token atual. O valor salvo é criptografado; a constante GAMB_GITHUB_TOKEN tem precedência e não é exibida.</p>
+                <label class="gamb-setting"><input type="checkbox" data-opt="github_clear_token" <?php disabled( defined( 'GAMB_GITHUB_TOKEN' ) ); ?>> Remover token salvo</label>
+                <?php $this->input( 'sanitizer_style_whitelist', 'IDs de estilos nativos preservados, separados por espaços', $options ); $this->input( 'audit_unresolved_shortcodes', 'Shortcodes não resolvidos que devem bloquear a publicação, sem colchetes', $options ); ?>
+                <button type="button" class="button button-primary gamb-save-settings-btn">Salvar configurações</button>
+                <h3>Auditoria de publicação</h3>
+                <p>O gate examina o buffer original e o HTML final. Um impedimento CRITICAL interrompe a entrega e preserva a publicação existente.</p>
+                <button type="button" class="button" data-run-audit>Revalidar origem agora</button>
+                <p data-audit-status role="status" aria-live="polite">Consulte o relatório para verificar a última execução.</p>
+                <ul data-audit-findings></ul>
+            </section>
             </div></div>
         </div>
         <?php
