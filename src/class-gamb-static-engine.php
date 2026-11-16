@@ -165,6 +165,7 @@ class Static_Engine {
 				$rel_file = $url_info["rel_file"];
 				$html     = $this->fetch_local_url_html( $url, '404.html' === $rel_file );
 				if ( "" === trim( $html, "\xEF\xBB\xBF \t\r\n" ) ) {
+					Gamb_Static_Auditor::capture_failure( $url );
 					$page_failures[] = $url;
 					continue;
 				}

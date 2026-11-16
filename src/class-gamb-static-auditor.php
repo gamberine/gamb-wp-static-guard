@@ -74,6 +74,10 @@ final class Gamb_Static_Auditor {
         if (!self::$findings) { self::$findings[] = array('severity' => 'CRITICAL', 'code' => 'export_processing_failed', 'source' => 'export'); }
         self::save(false);
     }
+    public static function capture_failure(string $source): void {
+        if (count(self::$findings) < 100) { self::$findings[] = array('severity' => 'CRITICAL', 'code' => 'capture_failed', 'source' => self::safe_source($source)); }
+        self::save(false);
+    }
     public static function audit_directory(string $directory): array {
         $root = realpath($directory);
         if (!$root || !is_dir($root)) { throw new \RuntimeException('Diretório estático inválido.'); }

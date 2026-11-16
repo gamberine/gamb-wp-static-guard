@@ -45,12 +45,13 @@ class Frontend_Policy {
     }
     public static function capture_error_scope() {
         if ( ! self::is_export_request() ) { return; }
-        $previous = ini_get( 'display_errors' ); ini_set( 'display_errors', '0' );
+        $previous = ini_get( 'display_errors' ); $previous_reporting = error_reporting();
+        ini_set( 'display_errors', '0' ); error_reporting( E_ALL );
         set_error_handler( static function( $severity, $message, $file, $line ) {
             if ( error_reporting() & $severity ) { Static_Engine::log_activity( 'Captura PHP: categoria ' . (int) $severity . ' em ' . basename( $file ) . ':' . (int) $line . '. Mensagem original omitida para proteger dados sensíveis.' ); }
             return true;
         }, E_WARNING | E_NOTICE | E_DEPRECATED | E_USER_WARNING | E_USER_NOTICE | E_USER_DEPRECATED );
-        register_shutdown_function( static function() use ( $previous ) { restore_error_handler(); ini_set( 'display_errors', (string) $previous ); } );
+        register_shutdown_function( static function() use ( $previous, $previous_reporting ) { restore_error_handler(); ini_set( 'display_errors', (string) $previous ); error_reporting( $previous_reporting ); } );
     }
     public static function runtime_patterns() {
         if ( is_admin() || ! Options::instance()->get( 'guard_active_on_live_site', true ) ) { return; }
