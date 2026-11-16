@@ -1,6 +1,14 @@
 # Registro de validação
 
-## Versão 4.2.0 — 13/11/2026
+## Versão 5.0.0 - 16/11/2026
+
+A suíte possui 125 verificações independentes e 17 adicionais com a HTML API oficial, totalizando 142 verificações por distribuição WordPress ensaiada. Os testes abrangem as regras de vazamento, contexto 404, shortcodes, whitelist, Unicode em JavaScript, SRI remoto e cache, recusa de SSRF, token AES-GCM adulterado, seleção de release, isolamento de atualização em lote, download com redirecionamento sem propagação do PAT e normalização de diretório.
+
+A matriz de integração contínua passa a PHP 8.1, 8.2, 8.3 e 8.4, com DOM, mbstring e OpenSSL. PHP 8.4 exercita o parser HTML5; as demais versões exercitam a alternativa DOMDocument. Os testes adicionais utilizam WordPress 6.2 e a distribuição oficial estável corrente. A compatibilidade com versões posteriores depende dos resultados futuros da matriz, sem garantia irrestrita.
+
+Na integração WordPress local, a primeira exportação da versão processou 206 arquivos e preservou os 398 registros e metadados editoriais, com seis backups mantidos. Os resultados adicionais de navegação, gate controlado, CLI e atualização são registrados no relatório privado da rodada. A auditoria não altera os conteúdos ou arquivos do tema consumidor.
+
+## Versão 4.2.0 - 13/11/2026
 
 Foram concluídas 56 regressões independentes e 17 verificações adicionais utilizando o parser da HTML API oficial: 73 verificações com o WordPress 6.2 e 72 com a distribuição instalada no ambiente de integração. A integração contínua também executa essa suíte sobre a distribuição oficial estável corrente.
 
@@ -10,7 +18,7 @@ Na instalação consumidora, a exportação completa processou 206 arquivos, pre
 
 O navegador conferiu Home e erros na origem, na publicação local, no celular e na prévia de rede, com bloqueio dos hosts externos: nenhum recurso remoto solicitado ou erro de execução observado. Os 86 endereços locais consultados responderam sem falha. O modelo 404 próprio do tema consumidor foi preservado; os critérios de seleção do fallback genérico foram validados pelas regressões. Esses ensaios não constituem homologação de todos os temas, CDNs ou serviços possíveis.
 
-## Versão 4.1.2 — 13/11/2026
+## Versão 4.1.2 - 13/11/2026
 
 Foram concluídas 40 verificações independentes. As novas regressões abrangem a rejeição de captura da Home sem contexto autenticado, com erro lógico ou com status HTTP incompatível; o documento de erro exige HTTP 404 e contexto de erro real. As classes nativas de erro, pesquisa e arquivo são removidas, preservando as classes próprias do tema consumidor.
 
@@ -18,7 +26,7 @@ Na integração WordPress, a Home respondeu com HTTP 200, `is_front_page() = tru
 
 A publicação preserva o título e a classe da Home e converte o canonical para o endereço estático configurado. As bibliotecas locais do consumidor foram preservadas. Esses resultados descrevem o ambiente de integração observado, sem substituir homologação em outros ambientes.
 
-## Registro anterior — versão 4.1.0
+## Registro anterior - versão 4.1.0
 
 Data: 13/11/2026. Versão: 4.1.0. Ambiente de integração: WordPress 7.1.4, PHP 8.3.26, Apache e navegador Chromium.
 

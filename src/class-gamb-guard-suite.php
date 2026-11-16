@@ -1,4 +1,5 @@
 <?php
+declare(strict_types=1);
 
 namespace GambWPStaticGuard;
 
@@ -351,6 +352,8 @@ class Gamb_Security_Suite {
 	}
 
 	public function cloak_html_content( $html ) {
+		// A captura autenticada entrega o buffer original ao gate, antes de ocultar marcadores.
+		if ( Frontend_Policy::is_export_request() ) { return $html; }
 		if ( ! is_string( $html ) || "" === $html || strpos( $html, "<" ) === false ) {
 			return $html;
 		}

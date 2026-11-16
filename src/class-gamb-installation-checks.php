@@ -1,4 +1,5 @@
 <?php
+declare(strict_types=1);
 namespace GambWPStaticGuard;
 if ( ! defined( 'ABSPATH' ) ) { exit; }
 
@@ -209,6 +210,9 @@ class Installation_Checks {
     public static function run() {
         $checks = array(); $audit = new self();
         $add = static function( $id, $status, $message ) use ( &$checks ) { $checks[] = array( 'id' => $id, 'status' => $status, 'message' => $message ); };
+        $native_parser = class_exists( '\\Dom\\HTMLDocument' );
+        $parser_available = $native_parser || class_exists( '\\DOMDocument' ) && function_exists( 'mb_encode_numericentity' );
+        $add( 'html_parser', $parser_available ? 'ok' : 'error', $native_parser ? 'Parser HTML5 nativo disponível.' : ( $parser_available ? 'Parser DOMDocument e mbstring disponíveis.' : 'Habilite DOM e mbstring para a sanitização e auditoria desta versão do PHP.' ) );
         $hash_available = function_exists( 'hash_hmac' ) && in_array( 'sha256', hash_algos(), true );
         $add( 'crypto', $hash_available ? 'ok' : 'error', $hash_available ? 'HMAC SHA-256 disponível para validação dos tokens.' : 'HMAC SHA-256 indisponível; os tokens de recursos não podem ser validados.' );
         $add( 'zip', class_exists( '\ZipArchive' ) ? 'ok' : 'warning', class_exists( '\ZipArchive' ) ? 'Extensão ZIP disponível.' : 'ZIP nativo indisponível: a exportação estática usa a alternativa do WordPress; o backup de banco com tema e extensões requer ZIP.' );

@@ -1,10 +1,13 @@
 <?php
+declare(strict_types=1);
 namespace GambWPStaticGuard;
 if ( ! defined( 'ABSPATH' ) ) { exit; }
 
 /** Controles de apresentação, condicionados ao perfil selecionado no site. */
 class Frontend_Policy {
     public static function register() {
+        add_action( 'template_redirect', array( __CLASS__, 'capture_error_scope' ), -10001 );
+        add_action( 'template_redirect', array( __CLASS__, 'runtime_patterns' ), -10000 );
         add_action( 'template_redirect', array( __CLASS__, 'send_export_context' ), 0 );
         add_action( 'wp_enqueue_scripts', array( __CLASS__, 'remove_unused_styles' ), 999 );
         add_filter( 'body_class', array( __CLASS__, 'body_classes' ), 999 );
@@ -36,15 +39,35 @@ class Frontend_Policy {
     public static function export_context_token() {
         return hash_hmac( 'sha256', 'gamb-static-export-context', wp_salt( 'nonce' ) );
     }
+    public static function is_export_request() {
+        $provided = $_SERVER['HTTP_X_GAMB_STATIC_EXPORT'] ?? '';
+        return is_string( $provided ) && '' !== $provided && hash_equals( self::export_context_token(), $provided );
+    }
+    public static function capture_error_scope() {
+        if ( ! self::is_export_request() ) { return; }
+        $previous = ini_get( 'display_errors' ); ini_set( 'display_errors', '0' );
+        set_error_handler( static function( $severity, $message, $file, $line ) {
+            if ( error_reporting() & $severity ) { Static_Engine::log_activity( 'Captura PHP: categoria ' . (int) $severity . ' em ' . basename( $file ) . ':' . (int) $line . '. Mensagem original omitida para proteger dados sensíveis.' ); }
+            return true;
+        }, E_WARNING | E_NOTICE | E_DEPRECATED | E_USER_WARNING | E_USER_NOTICE | E_USER_DEPRECATED );
+        register_shutdown_function( static function() use ( $previous ) { restore_error_handler(); ini_set( 'display_errors', (string) $previous ); } );
+    }
+    public static function runtime_patterns() {
+        if ( is_admin() || ! Options::instance()->get( 'guard_active_on_live_site', true ) ) { return; }
+        foreach ( array( 'wp_generator', 'wlwmanifest_link', 'rsd_link', 'wp_shortlink_wp_head', 'rest_output_link_wp_head', 'wp_oembed_add_discovery_links', 'print_emoji_detection_script', 'emoji_detection_script' ) as $callback ) {
+            foreach ( array( 0, 1, 7, 8, 10, 20 ) as $priority ) { remove_action( 'wp_head', $callback, $priority ); }
+        }
+        remove_action( 'wp_enqueue_scripts', 'wp_enqueue_emoji_styles' );
+    }
     public static function send_export_context() {
         $provided = isset( $_SERVER['HTTP_X_GAMB_STATIC_EXPORT'] ) ? (string) $_SERVER['HTTP_X_GAMB_STATIC_EXPORT'] : '';
         if ( '' === $provided || ! hash_equals( self::export_context_token(), $provided ) || headers_sent() ) { return; }
         header( 'X-Gamb-Static-Context: front=' . ( is_front_page() ? '1' : '0' ) . ';error=' . ( is_404() ? '1' : '0' ) );
     }
-    public static function auto_sizes( $value ) { return self::active( 'guard_remove_block_styles' ) ? false : $value; }
-    public static function speculation( $value ) { return self::active( 'guard_disable_speculation' ) ? null : $value; }
-    public static function texturize( $value ) { return self::active( 'guard_disable_texturize' ) ? false : $value; }
-    public static function asset_url( $url ) { if ( ! is_string( $url ) || '' === $url ) { return $url; } return self::active( 'guard_strip_asset_versions' ) ? remove_query_arg( 'ver', $url ) : $url; }
+    public static function auto_sizes( $value ) { return ! is_admin() && Options::instance()->get( 'guard_active_on_live_site', true ) ? false : $value; }
+    public static function speculation( $value ) { return ! is_admin() && Options::instance()->get( 'guard_active_on_live_site', true ) ? null : $value; }
+    public static function texturize( $value ) { return ! is_admin() && Options::instance()->get( 'guard_active_on_live_site', true ) ? false : $value; }
+    public static function asset_url( $url ) { if ( ! is_string( $url ) || '' === $url ) { return $url; } return ! is_admin() && Options::instance()->get( 'guard_active_on_live_site', true ) ? remove_query_arg( 'ver', $url ) : $url; }
 
     /** A exportação interrompe a entrega se ainda depender de uma rota interna não resolvida. */
     public static function postprocess_html( $html ) {
@@ -58,7 +81,7 @@ class Frontend_Policy {
             $html = preg_replace( '~<!--(?!\s*\[if).*?-->~s', '', $html );
         }
         $html = preg_replace_callback( '~\baria-label=(["\x27])(.*?)\1~is', static function( $match ) {
-            return 'aria-label=' . $match[1] . str_replace( array( '—', '–', '&#8211;', '&#8212;', '&mdash;', '&ndash;' ), '-', $match[2] ) . $match[1];
+            return 'aria-label=' . $match[1] . str_replace( array( '-', '-', '&#8211;', '&#8212;', '&mdash;', '&ndash;' ), '-', $match[2] ) . $match[1];
         }, $html );
         $html = $guard->rewrite_wp_paths_to_tokens( $html );
         $guard->register_tokens_in_content( $html );
@@ -68,6 +91,6 @@ class Frontend_Policy {
                 throw new \RuntimeException( 'A validação encontrou uma referência interna não resolvida. A entrega foi interrompida; consulte o registro e revise os recursos da origem.' );
             }
         }
-        return $html;
+        return Gamb_Static_Sanitizer::sanitize( $html );
     }
 }

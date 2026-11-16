@@ -1,4 +1,5 @@
 <?php
+declare(strict_types=1);
 /** Integração com a HTML API oficial, sem banco de dados e sem imitar seu parser. */
 $core = rtrim( getenv( 'GAMB_WP_HTML_API' ), '/\\' ) . '/wp-includes/html-api/';
 if ( ! is_file( $core . 'class-wp-html-tag-processor.php' ) ) { throw new RuntimeException( 'Informe um pacote oficial do WordPress em GAMB_WP_HTML_API.' ); }

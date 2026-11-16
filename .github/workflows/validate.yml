@@ -7,14 +7,18 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        php: ['7.4', '8.1', '8.3', '8.4']
-    container: php:${{ matrix.php }}-cli
+        php: ['8.1', '8.2', '8.3', '8.4']
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: shivammathur/setup-php@d52fc211a0436f8839a587b3b5b8efddab4744ea # v2
+        with:
+          php-version: ${{ matrix.php }}
+          extensions: dom, mbstring, openssl
+          coverage: none
       - name: Validar sintaxe PHP
         run: find src tests -name '*.php' -not -path '*/runtime/*' -print0 | xargs -0 -n1 php -l && php -l gamb-wp-static-guard.php
       - name: Executar regressões independentes
-        run: php tests/run.php
+        run: php -d error_reporting=E_ALL tests/run.php
   distribution:
     runs-on: ubuntu-latest
     steps:

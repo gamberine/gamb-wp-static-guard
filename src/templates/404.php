@@ -1,4 +1,5 @@
 <?php
+declare(strict_types=1);
 /** Modelo de apoio exclusivo para o fallback de temas clássicos sem 404. */
 if ( ! defined( 'ABSPATH' ) ) { exit; }
 status_header( 404 );
