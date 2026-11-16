@@ -2,6 +2,8 @@
 
 Este documento classifica as correções extraídas do projeto consumidor e estabelece o comportamento reutilizável do plugin. Não incorpora dados editoriais, identidade visual, campos ACF nem credenciais do projeto de origem.
 
+A matriz abaixo registra a incorporação até a versão 4.2.0. Na versão 5.0.0, a exportação passa a aplicar sanitização por padrões e gate CRITICAL, independentemente dos controles opcionais de limpeza da origem. A whitelist de estilos e os limites do atualizador estão na [arquitetura de segurança](SECURITY-ARCHITECTURE.md).
+
 ## Matriz de incorporação
 
 | Correção ou necessidade observada | Tratamento reutilizável | Disponibilidade |

@@ -56,7 +56,7 @@ A pasta local deve existir, permitir gravação e ser dedicada à publicação. 
 
 O caminho público deve corresponder à localização da publicação: vazio para a raiz do domínio ou, por exemplo, `/portal` para uma subpasta. Alterações em menus, opções globais ou templates exigem nova publicação quando não houver um adaptador específico de agendamento.
 
-A remoção de CSS nativo e de classes do corpo permanece desabilitada por padrão. Esses controles devem ser habilitados somente depois de verificar que o tema não depende deles. A minificação adicional também permanece desabilitada por padrão.
+Os controles opcionais de limpeza de classes e CSS na origem permanecem desabilitados por padrão. A exportação da versão 5 aplica sanitização por padrões independentemente desses controles, com whitelist explícita de estilos. Temas que dependem de identificadores ou estilos nativos exigem homologação. A minificação adicional permanece desabilitada por padrão.
 
 O painel apresenta caixas recolhíveis separadas para **STATIC/Conversão - HTML/ZIP** e **GUARD/Segurança - Blindado**. O escopo e o botão **Converter & Publicar Agora** permanecem em uma caixa independente.
 
