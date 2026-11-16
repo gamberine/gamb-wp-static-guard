@@ -6,6 +6,7 @@ if (!defined('ABSPATH')) { exit; }
 final class Gamb_DOM_Parser {
     public static function attribute(object $element, string $name): string { return (string)$element->getAttribute($name); }
     public static function parse(string $html): object {
+        $html = (string)preg_replace('/\A(?:\xEF\xBB\xBF|[\x20\t\r\n])+/', '', $html);
         $previous = libxml_use_internal_errors(true);
         try {
             if (class_exists('\\Dom\\HTMLDocument')) {

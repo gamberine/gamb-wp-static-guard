@@ -30,6 +30,10 @@ final class Gamb_Static_Auditor {
         }
         if ($final) {
             $document = Gamb_DOM_Parser::parse($html);
+            if ($home) {
+                $head = $document->getElementsByTagName('head')->item(0);
+                if (!$head || !$head->getElementsByTagName('title')->length) { $codes[] = 'home_document_structure'; }
+            }
             $allowed = Gamb_Static_Sanitizer::style_whitelist();
             foreach (Gamb_DOM_Parser::elements($document) as $element) {
                 foreach (preg_split('/\s+/', trim(Gamb_DOM_Parser::attribute($element, 'class'))) ?: array() as $class) {

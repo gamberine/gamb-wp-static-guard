@@ -32,6 +32,7 @@ foreach ($cases as $case) { expect(count(Auditor::inspect('<html><body>' . $case
 expect(in_array('accidental_home_404', Auditor::inspect('<title>Página não encontrada</title>', true), true), 'Recusar título de erro na Home.');
 expect(in_array('accidental_home_404', Auditor::inspect('<body class="error404 consumer">', true), true), 'Recusar classe de erro na Home antes da limpeza.');
 expect(!in_array('accidental_home_404', Auditor::inspect('<title>Página não encontrada</title>', false), true), 'Permitir documento 404 intencional.');
+expect(in_array('home_document_structure', Auditor::inspect('<html><head></head><body><h1>Home</h1></body></html>', true, true), true), 'Recusar Home final sem título no cabeçalho.');
 $options->set('audit_unresolved_shortcodes', 'consumer_form');
 expect(in_array('unresolved_shortcode', Auditor::inspect('[consumer_form id="1"]'), true), 'Bloquear shortcode configurado.');
 expect(!Auditor::inspect('[unrelated value]'), 'Preservar colchetes e shortcodes fora da configuração.');
@@ -39,6 +40,8 @@ $options->set('audit_unresolved_shortcodes', '');
 $source = '<!doctype html><html><head><style id="wp-new-feature-inline-css">body{color:red}</style><style id="consumer">:root{--wp--preset--color:red;--brand:blue}p{color:var(--brand)}/*# sourceURL=x */</style><script type="speculationrules">{}</script></head><body class="wp-new-feature consumer-home"><!-- internal --><div class="wp-block-demo consumer">14:00 &#8211; 16:00</div><a target="_blank" href="/link" aria-label="A &#8212; B">Link</a><script src="/local.js?ver=1"></script><script>const text="Educação";</script></body></html>';
 $clean = Sanitizer::sanitize($source);
 file_put_contents(__DIR__ . '/runtime/sanitized.html', $clean);
+$bom_document = \GambWPStaticGuard\Gamb_DOM_Parser::parse(Sanitizer::sanitize("\xEF\xBB\xBF\n" . $source));
+expect($bom_document->getElementsByTagName('body')->item(0)->getAttribute('class') === 'consumer-home' && $bom_document->getElementsByTagName('head')->item(0)->getElementsByTagName('title')->length === 0 && $bom_document->getElementsByTagName('head')->item(0)->getElementsByTagName('style')->length > 0, 'Remover BOM inicial sem deslocar head ou perder atributos do body.');
 expect(!str_contains($clean, 'wp-new-feature') && !str_contains($clean, 'wp-block-demo') && str_contains($clean, 'consumer-home'), 'Limpar classes em todos os elementos preservando as próprias.');
 expect(!str_contains($clean, 'speculationrules') && !str_contains($clean, '--wp--preset--') && str_contains($clean, '--brand:blue'), 'Remover estilos, regras e variáveis nativas preservando CSS próprio.');
 expect(!str_contains($clean, '<!--') && !str_contains($clean, 'sourceURL'), 'Remover todos os comentários HTML e anotações de origem.');
