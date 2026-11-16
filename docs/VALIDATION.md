@@ -2,7 +2,7 @@
 
 ## Versão 5.0.0 - 16/11/2026
 
-A suíte possui 125 verificações independentes e 17 adicionais com a HTML API oficial, totalizando 142 verificações por distribuição WordPress ensaiada. Os testes abrangem as regras de vazamento, contexto 404, shortcodes, whitelist, Unicode em JavaScript, SRI remoto e cache, recusa de SSRF, token AES-GCM adulterado, seleção de release, isolamento de atualização em lote, download com redirecionamento sem propagação do PAT e normalização de diretório.
+A suíte possui 126 verificações independentes e 17 adicionais com a HTML API oficial, totalizando 143 verificações por distribuição WordPress ensaiada. Os testes abrangem as regras de vazamento, contexto 404, shortcodes, whitelist, Unicode em JavaScript, SRI remoto e cache, recusa de SSRF, token AES-GCM adulterado, seleção de release, isolamento de atualização em lote, download com redirecionamento sem propagação do PAT e normalização de diretório.
 
 A matriz de integração contínua passa a PHP 8.1, 8.2, 8.3 e 8.4, com DOM, mbstring e OpenSSL. PHP 8.4 exercita o parser HTML5; as demais versões exercitam a alternativa DOMDocument. Os testes adicionais utilizam WordPress 6.2 e a distribuição oficial estável corrente. A compatibilidade com versões posteriores depende dos resultados futuros da matriz, sem garantia irrestrita.
 

@@ -14,6 +14,7 @@ final class Gamb_GitHub_Updater {
         add_filter('pre_set_site_transient_update_plugins', array($updater, 'filter_updates'));
         add_filter('plugins_api', array($updater, 'plugin_information'), 20, 3);
         add_filter('http_request_args', array($updater, 'download_headers'), 20, 2);
+        add_action('http_api_curl', array($updater, 'native_system_ca'), 20, 3);
         add_filter('upgrader_pre_download', array($updater, 'pre_download'), 20, 4);
         add_filter('upgrader_source_selection', array($updater, 'source_selection'), 20, 4);
         add_action('upgrader_process_complete', array($updater, 'after_update'), 20, 2);
@@ -117,6 +118,8 @@ final class Gamb_GitHub_Updater {
         return $this->allowed_initial_url($url);
     }
     public function download_headers(array $args, string $url): array {
+        try { $own_api = $url === 'https://api.github.com/repos/' . $this->repository() . '/releases/latest'; } catch (\RuntimeException $error) { $own_api = false; }
+        if (($this->downloading || $own_api) && defined('GAMB_GITHUB_CA_BUNDLE') && is_readable((string)constant('GAMB_GITHUB_CA_BUNDLE'))) { $args['sslcertificates'] = (string)constant('GAMB_GITHUB_CA_BUNDLE'); }
         if (!$this->downloading) { return $args; }
         $args['headers'] = (array)($args['headers'] ?? array());
         foreach (array_keys($args['headers']) as $key) { if (strtolower((string)$key) === 'authorization') { unset($args['headers'][$key]); } }
@@ -124,6 +127,15 @@ final class Gamb_GitHub_Updater {
             $args['headers'] = array_merge($args['headers'], $this->api_headers()); $args['headers']['Accept'] = 'application/octet-stream';
         }
         return $args;
+    }
+    public function native_system_ca(mixed $handle, array $args, string $url): void {
+        if (PHP_OS_FAMILY !== 'Windows' || !defined('CURLSSLOPT_NATIVE_CA')) { return; }
+        try { $own_api = $url === 'https://api.github.com/repos/' . $this->repository() . '/releases/latest'; } catch (\RuntimeException $error) { return; }
+        if (!$this->downloading && !$own_api) { return; }
+        // Certificados corporativos já confiados pelo Windows; a verificação TLS permanece obrigatória.
+        curl_setopt($handle, CURLOPT_SSL_OPTIONS, CURLSSLOPT_NATIVE_CA);
+        curl_setopt($handle, CURLOPT_SSL_VERIFYPEER, true);
+        curl_setopt($handle, CURLOPT_SSL_VERIFYHOST, 2);
     }
     public function pre_download(mixed $reply, string $package, mixed $upgrader, array $extra): mixed {
         if (false !== $reply || !$this->own_operation($extra)) { return $reply; }

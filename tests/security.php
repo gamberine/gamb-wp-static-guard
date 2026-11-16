@@ -68,6 +68,9 @@ expect(get_option('gamb_wp_static_guard_sri_epoch') !== $epoch_before, 'Invalida
 
 $updater = Updater::instance();
 expect(Updater::valid_repository('gamberine/gamb-wp-static-guard') && !Updater::valid_repository('../owner/repo'), 'Validar owner/repo.');
+$options->set('github_update_repository', '../invalid');
+expect($updater->download_headers(array('timeout' => 10), 'https://other.test/') === array('timeout' => 10) && $updater->latest() === null, 'Não afetar HTTP de terceiros com repositório inválido.');
+$options->set('github_update_repository', 'gamberine/gamb-wp-static-guard');
 expect($updater->set_token('fixture-secret-token') && $updater->token() === 'fixture-secret-token', 'Criptografar e recuperar token opcional.');
 expect(!str_contains(get_option(Updater::TOKEN_OPTION), 'fixture-secret-token'), 'Não persistir token em texto aberto.');
 $encrypted = get_option(Updater::TOKEN_OPTION); update_option(Updater::TOKEN_OPTION, substr($encrypted, 0, -6) . 'AAAAAA');

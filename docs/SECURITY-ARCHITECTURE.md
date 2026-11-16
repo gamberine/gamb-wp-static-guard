@@ -42,6 +42,8 @@ O fornecedor deve permitir CORS para carregar um recurso externo com SRI. Recurs
 
 A ativação de atualizações automáticas permanece uma escolha feita no painel nativo do WordPress. A instalação inicial da versão 5 em uma instalação que ainda não possua o atualizador requer o ZIP. Não é necessário editar wp-config.php para usar o repositório público.
 
+Redes corporativas podem inspecionar TLS. No Windows, quando o libcurl oferece CURLSSLOPT_NATIVE_CA, os pedidos próprios do atualizador também utilizam os certificados já confiados pelo sistema operacional. A validação de cadeia e de hostname permanece habilitada. A constante opcional GAMB_GITHUB_CA_BUNDLE admite um bundle corporativo legível; não é distribuído certificado privado no pacote e não se desabilita sslverify. A API GitHub também impõe limites de consulta por IP; um PAT opcional aumenta o limite para ambientes com IP compartilhado.
+
 ## CLI e operação
 
 ```sh
