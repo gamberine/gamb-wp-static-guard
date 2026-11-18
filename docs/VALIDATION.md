@@ -1,5 +1,11 @@
 # Registro de validação
 
+## Versão 5.0.1 - 18/11/2026
+
+Pacote de manutenção destinado à incorporação do CSS administrativo existente na instalação consumidora. A comparação preserva as regras anteriores e identifica três regras adicionais relativas ao menu. Os metadados de versão são atualizados em conjunto.
+
+A validação local concluiu 128 verificações independentes e 145 com a HTML API do WordPress instalado, além da análise de sintaxe de 18 arquivos PHP e da conferência dos 23 arquivos do ZIP. A comparação CSSOM em Chromium preservou as 34 regras anteriores e identificou as três regras adicionais. O banco de dados local estava indisponível nesta rodada; o acesso autenticado ao painel não foi repetido. A integridade SHA-256 é conferida após o download do pacote publicado. O resultado da matriz de compatibilidade permanece disponível no GitHub Actions do commit correspondente.
+
 ## Versão 5.0.0 - 16/11/2026
 
 A suíte possui 128 verificações independentes e 17 adicionais com a HTML API oficial, totalizando 145 verificações por distribuição WordPress ensaiada. Os testes abrangem as regras de vazamento, contexto 404, shortcodes, whitelist, Unicode em JavaScript, SRI remoto e cache, recusa de SSRF, token AES-GCM adulterado, seleção de release, isolamento de atualização em lote, download com redirecionamento sem propagação do PAT e normalização de diretório.

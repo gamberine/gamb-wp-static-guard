@@ -2,6 +2,12 @@
 
 Este documento distingue a incorporação histórica das novas alterações. As datas correspondem ao registro verificável, sem reconstruir datas de commits inexistentes.
 
+## 5.0.1 - 2026-11-18
+
+- Incorporar o ajuste visual existente na instalação consumidora ao menu administrativo: alinhamento do ícone, opacidade, espaçamento e identificação do item.
+- Reorganizar a folha de estilos para manutenção, preservando as regras anteriores do painel.
+- Atualizar os metadados de distribuição e disponibilizar pacote instalável com resumo SHA-256 próprio.
+
 ## 5.0.0 - 2026-11-16
 
 - Requerer PHP 8.1 e adotar strict_types em todos os arquivos PHP distribuídos.
