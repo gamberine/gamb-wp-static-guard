@@ -4,7 +4,7 @@ declare(strict_types=1);
  * Plugin Name: Gamb WP Static Guard
  * Plugin URI: https://github.com/gamberine/gamb-wp-static-guard
  * Description: Exportação estática, publicação local, pesquisa no navegador e controles de exposição para WordPress.
- * Version: 5.0.1
+ * Version: 5.1.0
  * Requires at least: 6.2
  * Requires PHP: 8.1
  * Author: Gamb
@@ -18,8 +18,8 @@ declare(strict_types=1);
 if ( ! defined( 'ABSPATH' ) ) { exit; }
 define( 'GAMB_STATIC_WP_PATH', plugin_dir_path( __FILE__ ) );
 define( 'GAMB_STATIC_WP_URL', untrailingslashit( plugin_dir_url( __FILE__ ) ) );
-define( 'GAMB_STATIC_WP_VERSION', '5.0.1' );
-foreach ( array( 'options', 'dom-parser', 'static-sanitizer', 'static-auditor', 'github-updater', 'frontend-policy', 'guard-suite', 'backup-service', 'static-engine', 'installation-checks', 'admin' ) as $module ) {
+define( 'GAMB_STATIC_WP_VERSION', '5.1.0' );
+foreach ( array( 'options', 'operation-progress', 'publication-status', 'version-monitor', 'dom-parser', 'static-sanitizer', 'static-auditor', 'github-updater', 'frontend-policy', 'guard-suite', 'backup-service', 'static-engine', 'installation-checks', 'admin' ) as $module ) {
     require_once GAMB_STATIC_WP_PATH . 'src/class-gamb-' . $module . '.php';
 }
 function gamb_wp_static_guard_activate() {
@@ -32,6 +32,8 @@ function gamb_wp_static_guard_deactivate() { wp_clear_scheduled_hook( 'gamb_stat
 register_deactivation_hook( __FILE__, 'gamb_wp_static_guard_deactivate' );
 add_action( 'plugins_loaded', static function() {
     \GambWPStaticGuard\Options::instance()->synchronize_version();
+    \GambWPStaticGuard\Publication_Status::register();
+    \GambWPStaticGuard\Version_Monitor::register();
     \GambWPStaticGuard\Frontend_Policy::register();
     \GambWPStaticGuard\Installation_Checks::register();
     \GambWPStaticGuard\Gamb_GitHub_Updater::register();

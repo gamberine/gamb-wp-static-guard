@@ -4,7 +4,7 @@ declare(strict_types=1);
 $site = __DIR__ . '/runtime/site/';
 foreach ( array( '', 'wp-content/themes/example/', 'wp-content/uploads/', 'wp-content/plugins/', 'wp-includes/' ) as $part ) { if ( ! is_dir( $site . $part ) ) { mkdir( $site . $part, 0777, true ); } }
 file_put_contents( $site . 'wp-content/themes/example/style.css', 'body{color:#123456}' );
-define( 'ABSPATH', $site ); define( 'WP_CONTENT_DIR', $site . 'wp-content' ); define( 'WP_PLUGIN_DIR', WP_CONTENT_DIR . '/plugins' ); define( 'WPINC', 'wp-includes' ); define( 'AUTH_KEY', 'automated-fixture-not-a-production-secret' ); define( 'GAMB_STATIC_WP_VERSION', '5.0.1' );
+define( 'ABSPATH', $site ); define( 'WP_CONTENT_DIR', $site . 'wp-content' ); define( 'WP_PLUGIN_DIR', WP_CONTENT_DIR . '/plugins' ); define( 'WPINC', 'wp-includes' ); define( 'AUTH_KEY', 'automated-fixture-not-a-production-secret' ); define( 'GAMB_STATIC_WP_VERSION', '5.1.0' );
 $legacy_key = base64_decode( 'c2ltcGx5LXN0YXRpYw==' );
 $legacy = array( 'use_minify' => false, 'relative_path' => '0', 'local_dir' => '/dedicated/output', 'ss_single_auto_export' => false, 'ss_single_auto_export_delay' => 0 );
 $GLOBALS['fixture_options'] = array( $legacy_key => $legacy );
@@ -43,7 +43,7 @@ function size_format( $size ) { return $size . ' B'; }
 function admin_url( $path ) { return 'https://example.test/wp-admin/' . $path; }
 function wp_create_nonce( $action ) { return 'test-nonce'; }
 function wp_json_encode( $value ) { return json_encode( $value ); }
-class WP_Error {}
+class WP_Error { public $code; public $message; public $data; public function __construct($code='', $message='', $data=array()) { $this->code=$code; $this->message=$message; $this->data=$data; } public function get_error_message() { return $this->message; } }
 function is_wp_error( $value ) { return $value instanceof WP_Error; }
 $checks = 0;
 function expect( $condition, $name ) { global $checks; if ( ! $condition ) { throw new RuntimeException( $name ); } $checks++; }
@@ -127,4 +127,5 @@ expect( \GambWPStaticGuard\Options::get_default_options()['guard_clean_body_clas
 expect( \GambWPStaticGuard\Options::get_default_options()['fallback_404'] && \GambWPStaticGuard\Options::get_default_options()['ensure_home_canonical'] && \GambWPStaticGuard\Options::get_default_options()['refresh_local_integrity'], 'Disponibilizar integrações portáteis nas novas instalações.' );
 if ( getenv( 'GAMB_WP_HTML_API' ) ) { require __DIR__ . '/html-api.php'; }
 require __DIR__ . '/security.php';
+require __DIR__ . '/workflow.php';
 echo $checks . " verificações independentes concluídas.\n";

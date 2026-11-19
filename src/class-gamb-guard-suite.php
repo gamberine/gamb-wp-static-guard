@@ -697,6 +697,7 @@ class Gamb_Security_Suite {
 				if ( isset( $processed[ $tok ] ) ) {
 					continue;
 				}
+				Operation_Progress::phase('export',4,6,count($processed),count($this->export_tokens),'Materializando recursos tokenizados.');
 				$processed[ $tok ] = true;
 				$src_path = $info["disk"];
 				if ( ! is_file( $src_path ) || ! self::is_public_asset( $info["rel"] ) ) {

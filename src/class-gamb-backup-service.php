@@ -76,6 +76,7 @@ class Backup_Service {
 		$table_count = 0;
 
 		foreach ( (array) $tables as $table ) {
+			Operation_Progress::phase('backup',1,4,$table_count,count((array)$tables),'Copiando tabelas do banco de dados.');
 			$table = (string) $table;
 			if ( "" === $table ) {
 				continue;
@@ -145,6 +146,7 @@ class Backup_Service {
 			$history = is_array( $history ) ? $history : array();
 			$history[$result['filename']] = microtime( true );
 			if ( false === file_put_contents( $history_file, wp_json_encode( $history ) ) ) { return new \WP_Error( 'backup_history', 'Não foi possível registrar a ordem das cópias de segurança.' ); }
+			Operation_Progress::phase('backup',4,4,0,1,'Aplicando a retenção das seis cópias mais recentes.');
 			$retention = self::enforce_retention();
 			if ( is_wp_error( $retention ) ) { return $retention; }
 			$result['retained_backups'] = count( self::list_backups() );
@@ -189,6 +191,7 @@ class Backup_Service {
 			);
 		}
 
+		Operation_Progress::phase('backup',2,4,0,1,'Preparando o pacote de segurança.');
 		$zip = new \ZipArchive();
 		$res = $zip->open( $zip_path, \ZipArchive::CREATE | \ZipArchive::OVERWRITE );
 		if ( true !== $res ) {
@@ -235,6 +238,8 @@ class Backup_Service {
 			self::add_directory_to_zip( $zip, $plugins_dir, "wp-content/plugins" );
 		}
 
+		Operation_Progress::phase('backup',3,4,0,1,'Finalizando o arquivo da cópia de segurança.');
+		if (method_exists($zip,'registerProgressCallback')) { $zip->registerProgressCallback(0.02,static function($ratio) { Operation_Progress::phase('backup',3,4,(int)round($ratio*10000),10000,'Compactando a cópia de segurança.'); }); }
 		if ( ! $zip->close() ) { return new \WP_Error( "backup_zip", "Não foi possível concluir o pacote ZIP." ); }
 		@unlink( $sql_path );
 

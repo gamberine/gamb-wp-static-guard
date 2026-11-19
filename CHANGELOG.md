@@ -2,6 +2,17 @@
 
 Este documento distingue a incorporação histórica das novas alterações. As datas correspondem ao registro verificável, sem reconstruir datas de commits inexistentes.
 
+## 5.1.0 - 2026-11-19
+
+- Integrar o monitor da versão WordPress, com configuração de IPs exatos e proxies confiáveis, normalização IPv4/IPv6 e resposta JSON protegida contra cache.
+- Preservar as rotas de compatibilidade do monitor 3.3.2 quando habilitado; manter o recurso desabilitado e sem IPs institucionais nos padrões da distribuição.
+- Incorporar as alterações locais da folha de estilos e converter os botões laterais em abas navegáveis, com seleção, hover e foco nativo preservado.
+- Adotar três accordions exclusivos, etiquetas compactas para HTML/ZIP e Blindado e monitor de revisão e destino da publicação.
+- Acrescentar acesso direto às releases do GitHub no cabeçalho do painel.
+- Registrar progresso por etapas e unidades no servidor, com barra persistente, percentual no título, retomada após recarregamento, recusa de concorrência e identificação de falhas.
+- Instrumentar publicação, configuração, diagnóstico, consulta de atualizações, auditoria e backups; preservar a retenção das seis cópias mais recentes.
+- Ampliar regressões de IP, proxy, execução concorrente, repetição de pedidos, interrupções e sincronização editorial.
+
 ## 5.0.1 - 2026-11-18
 
 - Incorporar o ajuste visual existente na instalação consumidora ao menu administrativo: alinhamento do ícone, opacidade, espaçamento e identificação do item.

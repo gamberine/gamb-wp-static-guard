@@ -1,112 +1,41 @@
 (function () {
   'use strict';
   document.addEventListener('DOMContentLoaded', function () {
-    var config = window.gambGuardData;
-    if (!config) return;
-    function request(route, payload) {
-      return fetch(config.restUrl + route, {method:payload === undefined ? 'GET' : 'POST',headers:{'Content-Type':'application/json','X-WP-Nonce':config.nonce},body:payload === undefined ? undefined : JSON.stringify(payload)}).then(function (response) {
-        return response.json().then(function (result) {
-          if (!response.ok || !result || result.success === false || result.code) throw new Error(result && result.message ? result.message : 'Não foi possível concluir a operação.');
-          return result;
-        });
-      });
-    }
-    var single = document.querySelector('[data-gamb-single]');
-    if (single) single.addEventListener('click', function () {
-      single.disabled = true;
-      var message = document.querySelector('[data-gamb-single-message]');
-      message.textContent = 'Publicação em andamento.';
-      request('apply-single', {post_id:Number(single.dataset.gambSingle)}).then(function () { message.textContent = 'Publicação concluída.'; }).catch(function (error) { message.textContent = error.message; }).finally(function () { single.disabled = false; });
-    });
-    var root = document.getElementById('gamb-guard-admin-app');
-    if (!root) return;
-    var notice = root.querySelector('#gamb-toast');
-    function notify(message, error) { notice.textContent = message; notice.hidden = false; notice.classList.toggle('gamb-error', !!error); }
-    function showSecurity(result) {
-      root.querySelector('[data-update-status]').textContent = 'Instalada: ' + result.installed + '. GitHub: ' + (result.latest || 'consulta indisponível') + '. ' + (result.update_available ? 'Atualização disponível no WordPress.' : '') + ' Token: ' + (result.token_configured ? 'configurado' : 'não configurado') + '.';
-      var audit = result.audit || {}, list = root.querySelector('[data-audit-findings]'); list.replaceChildren();
-      root.querySelector('[data-audit-status]').textContent = result.audit_pending ? 'Revalidação agendada após atualização.' : audit.checked_at ? 'Auditoria: ' + audit.checked_at + '. ' + (audit.success ? 'Aprovada.' : 'Impedimentos encontrados.') : 'Auditoria ainda não realizada.';
-      (audit.findings || []).forEach(function (finding) { var item = document.createElement('li'); item.textContent = finding.severity + ': ' + finding.code + ' (' + finding.source + ')'; list.appendChild(item); });
-    }
-    [['[data-check-updates]', 'check-updates'], ['[data-run-audit]', 'audit']].forEach(function (operation) {
-      var button = root.querySelector(operation[0]);
-      button.addEventListener('click', function () { button.disabled = true; notify('Verificação em andamento.'); request(operation[1], {}).then(function (result) { showSecurity(result); notify('Verificação concluída.'); }).catch(function (error) { notify(error.message, true); }).finally(function () { button.disabled = false; }); });
-    });
-    function showDiagnostics(result) {
-      var installation = result.installation || {}, resources = result.publication && result.publication.dependencies ? result.publication : installation.resources || {};
-      root.querySelector('[data-diagnostics-time]').textContent = installation.checked_at || 'Não realizada';
-      var list = root.querySelector('[data-installation-checks]'); list.replaceChildren();
-      (installation.checks || []).forEach(function (check) { var item = document.createElement('li'); item.textContent = ({ok:'Verificado',warning:'Atenção',error:'Impedimento'}[check.status] || 'Informação') + ': ' + check.message; list.appendChild(item); });
-      root.querySelector('[data-dependency-summary]').textContent = (resources.dependencies || []).length + ' dependência(s); ' + (resources.external_navigation_count || 0) + ' link(s) externo(s) de navegação. ' + (resources.limited ? 'Limite de inspeção atingido. ' : '') + (resources.scope || '');
-      list = root.querySelector('[data-dependency-list]'); list.replaceChildren();
-      (resources.dependencies || []).forEach(function (dependency) { var item = document.createElement('li'); item.textContent = dependency.kind + ': ' + dependency.url; list.appendChild(item); });
-    }
-    var diagnosticsButton = root.querySelector('[data-run-diagnostics]');
-    diagnosticsButton.addEventListener('click', function () {
-      diagnosticsButton.disabled = true; notify('Verificação da origem em andamento.');
-      request('diagnostics', {}).then(function (result) { showDiagnostics(result); notify('Diagnóstico atualizado.'); }).catch(function (error) { notify(error.message, true); }).finally(function () { diagnosticsButton.disabled = false; });
-    });
-    function loadBackups() {
-      var container = root.querySelector('[data-backup-list]');
-      return request('backups').then(function (backups) {
-        container.replaceChildren();
-        if (!backups.length) { container.textContent = 'Nenhuma cópia de segurança registrada.'; return; }
-        var table = document.createElement('table');
-        var header = document.createElement('tr');
-        ['Arquivo', 'Data', 'Tamanho', 'Ações'].forEach(function (label) { var cell = document.createElement('th'); cell.scope = 'col'; cell.textContent = label; header.appendChild(cell); });
-        var head = document.createElement('thead'); head.appendChild(header); table.appendChild(head);
-        var body = document.createElement('tbody');
-        backups.forEach(function (backup) {
-          var row = document.createElement('tr');
-          [backup.filename, backup.created_at, backup.size_formatted].forEach(function (value) { var cell = document.createElement('td'); cell.textContent = value; row.appendChild(cell); });
-          var actions = document.createElement('td'); var download = document.createElement('a'); download.href = backup.download_url; download.textContent = 'Baixar'; actions.appendChild(download);
-          var remove = document.createElement('button'); remove.type = 'button'; remove.className = 'button'; remove.textContent = 'Excluir'; remove.setAttribute('aria-label', 'Excluir ' + backup.filename); remove.addEventListener('click', function () { if (!confirm('Excluir esta cópia de segurança?')) return; remove.disabled = true; request('backup/delete', {filename:backup.filename}).then(loadBackups).catch(function (error) { notify(error.message, true); remove.disabled = false; }); }); actions.appendChild(document.createTextNode(' ')); actions.appendChild(remove); row.appendChild(actions); body.appendChild(row);
-        });
-        table.appendChild(body); container.appendChild(table);
-      }).catch(function (error) { notify(error.message, true); });
-    }
-    root.querySelectorAll('[data-tab]').forEach(function (button) {
-      button.addEventListener('click', function () {
-        root.querySelectorAll('[data-tab]').forEach(function (item) { item.setAttribute('aria-pressed', String(item === button)); });
-        root.querySelectorAll('.gamb-panel').forEach(function (panel) { panel.hidden = panel.id !== button.getAttribute('aria-controls'); });
-        if (button.dataset.tab === 'backup') loadBackups();
-        if (button.dataset.tab === 'diagnostics') request('diagnostics').then(showDiagnostics).catch(function (error) { notify(error.message, true); });
-        if (button.dataset.tab === 'updates') request('security-status').then(showSecurity).catch(function (error) { notify(error.message, true); });
-      });
-    });
-    root.querySelectorAll('.gamb-save-settings-btn').forEach(function (button) {
-      button.addEventListener('click', function () {
-        var payload = {};
-        root.querySelectorAll('[data-opt]').forEach(function (field) { payload[field.dataset.opt] = field.type === 'checkbox' ? field.checked : field.value; });
-        payload.post_types = Array.from(root.querySelectorAll('.gamb-pt-checkbox:checked')).map(function (field) { return field.value; });
-        button.disabled = true;
-        request('settings', payload).then(function () { root.querySelector('[data-opt=github_update_token]').value = ''; root.querySelector('[data-opt=github_clear_token]').checked = false; notify('Configurações salvas.'); }).catch(function (error) { notify(error.message, true); }).finally(function () { button.disabled = false; });
-      });
-    });
-    root.querySelectorAll('.gamb-run-export-btn').forEach(function (button) {
-      button.addEventListener('click', function () {
-        button.disabled = true; notify('Publicação em andamento. Aguarde a conclusão.');
-        request('start-export', {type:root.querySelector('#gamb-quick-scope').value}).then(function (result) {
-          notify('Publicação concluída. Arquivos processados: ' + result.files_count + '.' + (result.dependency_warnings ? ' Há dependências externas; consulte o diagnóstico.' : ''));
-          root.querySelector('#stat-last-time').textContent = result.exported_at;
-          root.querySelector('#stat-last-scope').textContent = result.scope_label;
-          root.querySelector('#stat-last-count').textContent = result.files_count;
-          if (result.first_full_export_completed) { root.querySelectorAll('#gamb-quick-scope option').forEach(function (option) { option.disabled = false; }); var initial = root.querySelector('[data-first-full-notice]'); if (initial) initial.hidden = true; }
-          var log = root.querySelector('#gamb-activity-log-box'); log.replaceChildren();
-          (result.messages || []).forEach(function (entry) { var row = document.createElement('p'); row.textContent = entry.datetime + ' - ' + entry.message; log.appendChild(row); });
-          if (result.download_url) { var link = document.createElement('a'); link.href = result.download_url; link.textContent = 'Baixar pacote estático'; link.className = 'button'; root.querySelector('#gamb-latest-zip-wrap').replaceChildren(link); }
-        }).catch(function (error) { notify(error.message, true); }).finally(function () { button.disabled = false; });
-      });
-    });
-    root.querySelectorAll('.gamb-create-backup-btn').forEach(function (button) {
-      button.addEventListener('click', function () {
-        button.disabled = true; notify('Geração da cópia de segurança em andamento.');
-        request('backup', {type:button.dataset.backupType}).then(function (result) {
-          notify('Cópia de segurança gerada.');
-          loadBackups();
-          if (result.download_url) { var link = document.createElement('a'); link.href = result.download_url; link.textContent = 'Baixar cópia de segurança'; link.className = 'button'; button.parentNode.appendChild(link); }
-        }).catch(function (error) { notify(error.message, true); }).finally(function () { button.disabled = false; });
-      });
-    });
+    var config=window.gambGuardData, root=document.getElementById('gamb-guard-admin-app'), single=document.querySelector('[data-gamb-single]');
+    if (!config || (!root && !single)) return;
+    var title=document.title, busy=false, timer, activeId='', responsePendingId='', locked=new Map(), last, notice=root && root.querySelector('#gamb-toast');
+    if (!notice) { notice=document.createElement('div'); notice.className='gamb-process'; notice.setAttribute('role','status'); notice.setAttribute('aria-live','polite'); notice.innerHTML='<div class="gamb-process-heading"><strong data-process-label></strong><span data-process-percent></span></div><div class="gamb-progress-track" role="progressbar" aria-label="Progresso das etapas" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span data-process-bar></span></div><p data-process-message></p><small data-process-units></small>'; single.parentNode.appendChild(notice); }
+    function request(route,payload) { return fetch(config.restUrl+route,{method:payload===undefined?'GET':'POST',credentials:'same-origin',cache:'no-store',headers:{'Content-Type':'application/json','X-WP-Nonce':config.nonce},body:payload===undefined?undefined:JSON.stringify(payload)}).then(function(r){return r.json().then(function(d){if(!r.ok || !d || d.success===false || d.code){var error=Error(d && d.message || 'Não foi possível concluir a operação.');error.status=r.status;throw error;}return d;});}); }
+    function lock(value) { busy=value; if(value)document.querySelectorAll('#gamb-guard-admin-app button:not([data-tab]),[data-gamb-single]').forEach(function(b){if(!locked.has(b))locked.set(b,b.disabled);b.disabled=true;});else{locked.forEach(function(v,b){b.disabled=v;});locked.clear();} }
+    function terminal(s){return ['success','warning','error'].indexOf(s.status)!==-1;}
+    function render(s){last=s;var p=Math.max(0,Math.min(100,Number(s.percent)||0)),ongoing=!terminal(s);notice.hidden=false;notice.dataset.state=s.status;notice.setAttribute('aria-busy',String(ongoing));notice.querySelector('[data-process-label]').textContent=s.label||'Operação';notice.querySelector('[data-process-percent]').textContent=p+'%';notice.querySelector('[data-process-bar]').style.width=p+'%';notice.querySelector('[role=progressbar]').setAttribute('aria-valuenow',String(p));notice.querySelector('[data-process-message]').textContent=s.message||'';notice.querySelector('[data-process-units]').textContent=s.phases?'Etapa '+s.phase+'/'+s.phases+' · '+s.done+'/'+s.total+' unidades. Percentual das etapas executadas.':'Percentual de unidades concluídas.';document.title='['+p+'%] '+(ongoing?'Em andamento: ':s.status==='error'?'Falha: ':'Concluído: ')+(s.label||'Operação')+' — '+title;if(single){var m=document.querySelector('[data-gamb-single-message]');if(m)m.textContent=s.message||'';}}
+    function local(label,status,message,percent){return{label:label,status:status,message:message,percent:percent};}
+    function fail(e,label){render(local(label||'Operação','error',e.message,last?last.percent:0));}
+    function publication(){if(!root)return Promise.resolve();return request('publication-status').then(function(d){var b=root.querySelector('[data-publication-badge]');b.textContent=d.label;b.dataset.tone=d.tone;root.querySelector('[data-publication-message]').textContent=d.message+(d.published_at?' Última entrega: '+d.published_at+'.':'');});}
+    function watch(id){clearTimeout(timer);activeId=id;function tick(){request('operation-status?id='+encodeURIComponent(id)).then(function(s){if(activeId!==id)return;render(s);if(terminal(s)){activeId='';if(responsePendingId!==id)lock(false);publication().catch(function(){});}else timer=setTimeout(tick,document.hidden?1800:650);}).catch(function(e){if(activeId!==id)return;notice.querySelector('[data-process-message]').textContent='Consulta de progresso indisponível: '+e.message+' A execução no servidor pode continuar. Não inicie outra operação.';timer=setTimeout(tick,2500);});}tick();}
+    function task(kind,route,payload,done){if(busy)return Promise.resolve();lock(true);render(local('Preparando operação','running','Solicitando a execução ao servidor.',0));var id='';return request('operations',{kind:kind}).then(function(s){id=s.id;responsePendingId=id;render(s);watch(id);return request(route,Object.assign({},payload||{},{_gamb_operation:id}));}).then(function(d){return request('operation-status?id='+encodeURIComponent(id)).then(function(s){if(activeId===id){clearTimeout(timer);activeId='';}render(s);responsePendingId='';lock(false);return Promise.resolve(done&&done(d)).then(publication);});}).catch(function(e){responsePendingId='';if(!id){lock(false);fail(e);return;}return request('operation-status?id='+encodeURIComponent(id)).then(function(s){render(s);if(terminal(s)){clearTimeout(timer);activeId='';lock(false);}else{watch(id);notice.querySelector('[data-process-message]').textContent+=' A resposta não chegou; o acompanhamento permanece ativo.';}}).catch(function(){fail(e);watch(id);});});}
+    function load(label,callback){if(busy)return Promise.resolve().then(callback).catch(function(){});render(local(label,'running','Carregando dados.',0));return Promise.resolve().then(callback).then(function(){if(!busy)render(local(label,'success','Dados carregados.',100));}).catch(function(e){if(!busy)fail(e,label);});}
+    window.addEventListener('beforeunload',function(e){if(busy){e.preventDefault();e.returnValue='';}});
+    var observing=false;
+    setInterval(function(){if(busy||observing)return;observing=true;request('operation-status').then(function(s){if(s.id&&!terminal(s)&&!busy){lock(true);render(s);watch(s.id);}}).catch(function(){}).finally(function(){observing=false;});},5000);
+    if(single)single.addEventListener('click',function(){task('single','apply-single',{post_id:Number(single.dataset.gambSingle)});});
+    if(!root){request('operation-status').then(function(s){if(s.id&&!terminal(s)){lock(true);render(s);watch(s.id);}}).catch(function(){});return;}
+    function security(d){root.querySelector('[data-update-status]').textContent='Instalada: '+d.installed+'. GitHub: '+(d.latest||'consulta indisponível')+'. '+(d.update_available?'Atualização disponível no WordPress. ':'')+'Token: '+(d.token_configured?'configurado':'não configurado')+'.';var a=d.audit||{},list=root.querySelector('[data-audit-findings]');list.replaceChildren();root.querySelector('[data-audit-status]').textContent=d.audit_pending?'Revalidação agendada após atualização.':a.checked_at?'Auditoria: '+a.checked_at+'. '+(a.success?'Aprovada.':'Impedimentos encontrados.'):'Auditoria ainda não realizada.';(a.findings||[]).forEach(function(f){var i=document.createElement('li');i.textContent=f.severity+': '+f.code+' ('+f.source+')';list.appendChild(i);});}
+    [['[data-check-updates]','updates','check-updates'],['[data-run-audit]','audit','audit']].forEach(function(a){root.querySelector(a[0]).addEventListener('click',function(){task(a[1],a[2],{},security);});});
+    function diagnostics(d){var a=d.installation||{},r=d.publication&&d.publication.dependencies?d.publication:a.resources||{},list=root.querySelector('[data-installation-checks]');root.querySelector('[data-diagnostics-time]').textContent=a.checked_at||'Não realizada';list.replaceChildren();(a.checks||[]).forEach(function(c){var i=document.createElement('li');i.textContent=({ok:'Verificado',warning:'Atenção',error:'Impedimento'}[c.status]||'Informação')+': '+c.message;list.appendChild(i);});root.querySelector('[data-dependency-summary]').textContent=(r.dependencies||[]).length+' dependência(s); '+(r.external_navigation_count||0)+' link(s) externo(s) de navegação. '+(r.limited?'Limite de inspeção atingido. ':'')+(r.scope||'');list=root.querySelector('[data-dependency-list]');list.replaceChildren();(r.dependencies||[]).forEach(function(c){var i=document.createElement('li');i.textContent=c.kind+': '+c.url;list.appendChild(i);});}
+    root.querySelector('[data-run-diagnostics]').addEventListener('click',function(){task('diagnostics','diagnostics',{},diagnostics);});
+    function backups(){return request('backups').then(function(rows){var box=root.querySelector('[data-backup-list]');box.replaceChildren();if(!rows.length){box.textContent='Nenhuma cópia de segurança registrada.';return;}var table=document.createElement('table'),head=document.createElement('thead'),tr=document.createElement('tr'),body=document.createElement('tbody');['Arquivo','Data','Tamanho','Ações'].forEach(function(t){var c=document.createElement('th');c.scope='col';c.textContent=t;tr.appendChild(c);});head.appendChild(tr);table.appendChild(head);rows.forEach(function(b){var row=document.createElement('tr');[b.filename,b.created_at,b.size_formatted].forEach(function(t){var c=document.createElement('td');c.textContent=t;row.appendChild(c);});var actions=document.createElement('td'),link=document.createElement('a'),remove=document.createElement('button');link.href=b.download_url;link.textContent='Baixar';actions.appendChild(link);remove.type='button';remove.className='button';remove.textContent='Excluir';remove.setAttribute('aria-label','Excluir '+b.filename);remove.addEventListener('click',function(){if(!busy&&confirm('Excluir esta cópia de segurança?'))task('backup-delete','backup/delete',{filename:b.filename},backups);});actions.appendChild(document.createTextNode(' '));actions.appendChild(remove);row.appendChild(actions);body.appendChild(row);});table.appendChild(body);box.appendChild(table);});}
+    function monitor(){return request('version-monitor').then(function(d){root.querySelector('[data-monitor-status]').textContent=(d.enabled?'Habilitado. ':'Desabilitado. ')+'Origem da conexão: '+d.peer+'. '+(d.allowed?'Esta origem está autorizada.':'Esta origem não está autorizada no endpoint público.');});}
+    root.querySelector('[data-test-monitor]').addEventListener('click',function(){if(busy)return;load('Verificação do monitor',function(){var u=new URL(root.querySelector('[data-monitor-url]').href);if(u.origin!==location.origin)throw Error('O endpoint deve pertencer à origem atual.');return fetch(u.href,{credentials:'omit',cache:'no-store',mode:'same-origin'}).then(function(r){return r.json().then(function(d){root.querySelector('[data-monitor-result]').textContent='HTTP '+r.status+'\n'+JSON.stringify(d,null,2);if(!r.ok)throw Error(d.message||'Acesso recusado conforme a política de IPs.');});});});});
+    var tabs=Array.from(root.querySelectorAll('[data-tab]'));
+    root.querySelectorAll('.gamb-admin-nav').forEach(function(n){n.setAttribute('role','tablist');n.setAttribute('aria-orientation','vertical');});
+    function select(b,fetchData){tabs.forEach(function(t){var on=t===b;t.setAttribute('aria-pressed',String(on));t.setAttribute('aria-selected',String(on));t.tabIndex=on?0:-1;});root.querySelectorAll('.gamb-admin-nav').forEach(function(n){if(!n.querySelector('[aria-selected=true]'))n.querySelector('[data-tab]').tabIndex=0;});root.querySelectorAll('.gamb-panel').forEach(function(p){p.hidden=p.id!==b.getAttribute('aria-controls');});b.closest('details').open=true;if(fetchData){if(b.dataset.tab==='backup')load('Lista de backups',backups);if(b.dataset.tab==='diagnostics')load('Diagnóstico registrado',function(){return request('diagnostics').then(diagnostics);});if(b.dataset.tab==='updates')load('Atualizações e auditoria',function(){return request('security-status').then(security);});if(b.dataset.tab==='monitor')load('Monitor da versão WordPress',monitor);}}
+    tabs.forEach(function(b){b.classList.add('gamb-tab');b.setAttribute('role','tab');b.id='gamb-tab-'+b.dataset.tab;var p=root.querySelector('#'+b.getAttribute('aria-controls'));p.setAttribute('role','tabpanel');p.setAttribute('aria-labelledby',b.id);b.addEventListener('click',function(){select(b,true);});b.addEventListener('keydown',function(e){var a=Array.from(b.parentNode.querySelectorAll('[data-tab]')),i=a.indexOf(b),t;if(e.key==='ArrowDown'||e.key==='ArrowRight')t=a[(i+1)%a.length];if(e.key==='ArrowUp'||e.key==='ArrowLeft')t=a[(i+a.length-1)%a.length];if(e.key==='Home')t=a[0];if(e.key==='End')t=a[a.length-1];if(t){e.preventDefault();t.focus();select(t,true);}});});
+    var sections=Array.from(root.querySelectorAll('.gamb-sidebar details'));sections.forEach(function(d){d.addEventListener('toggle',function(){if(d.open)sections.forEach(function(o){if(o!==d)o.open=false;});});});select(tabs[0],false);
+    root.querySelectorAll('.gamb-save-settings-btn').forEach(function(b){b.addEventListener('click',function(){var p={};root.querySelectorAll('[data-opt]').forEach(function(f){p[f.dataset.opt]=f.type==='checkbox'?f.checked:f.value;});p.post_types=Array.from(root.querySelectorAll('.gamb-pt-checkbox:checked')).map(function(f){return f.value;});task('settings','settings',p,function(){root.querySelector('[data-opt=github_update_token]').value='';root.querySelector('[data-opt=github_clear_token]').checked=false;return monitor();});});});
+    root.querySelectorAll('.gamb-run-export-btn').forEach(function(b){b.addEventListener('click',function(){task('export','start-export',{type:root.querySelector('#gamb-quick-scope').value},function(d){root.querySelector('#stat-last-time').textContent=d.exported_at;root.querySelector('#stat-last-scope').textContent=d.scope_label;root.querySelector('#stat-last-count').textContent=d.files_count;if(d.first_full_export_completed){root.querySelectorAll('#gamb-quick-scope option').forEach(function(o){o.disabled=false;});root.querySelector('[data-first-full-notice]').hidden=true;}var log=root.querySelector('#gamb-activity-log-box');log.replaceChildren();(d.messages||[]).forEach(function(e){var p=document.createElement('p');p.textContent=e.datetime+' - '+e.message;log.appendChild(p);});if(d.download_url){var a=document.createElement('a');a.href=d.download_url;a.className='button';a.textContent='Baixar pacote estático';root.querySelector('#gamb-latest-zip-wrap').replaceChildren(a);}});});});
+    root.querySelectorAll('.gamb-create-backup-btn').forEach(function(b){b.addEventListener('click',function(){task('backup','backup',{type:b.dataset.backupType},backups);});});
+    lock(true);render(local('Carregando painel','running','Consultando os estados registrados.',0));var count=0,saved;
+    Promise.all([request('operation-status').then(function(s){saved=s;if(s.id&&!terminal(s))render(s);}),publication(),monitor()].map(function(p){return p.then(function(){count++;if(!saved||!saved.id||terminal(saved))render(local('Carregando painel','running',count+'/3 consultas concluídas.',Math.floor(count/3*100)));});})).then(function(){if(saved&&saved.id){render(saved);if(!terminal(saved)){watch(saved.id);}else lock(false);}else{lock(false);render(local('Painel','success','Estados da publicação e do monitor carregados.',100));}}).catch(function(e){lock(false);fail(e,'Carregamento do painel');});
   });
 })();

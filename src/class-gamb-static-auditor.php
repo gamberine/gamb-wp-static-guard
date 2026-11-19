@@ -103,6 +103,7 @@ final class Gamb_Static_Auditor {
         self::begin();
         try {
             foreach (array('home' => home_url('/'), 'error' => home_url('/gamb-static-guard-missing-page-404/')) as $kind => $url) {
+                Operation_Progress::phase('audit',$kind==='home' ? 1 : 2,3,0,1,'Auditando a origem: '.$kind.'.');
                 $response = wp_remote_get($url, array('timeout' => 25, 'limit_response_size' => 5242880, 'headers' => array('X-Gamb-Static-Export' => Frontend_Policy::export_context_token())));
                 if (is_wp_error($response) || !Static_Engine::get_instance()->capture_response_is_valid($url, wp_remote_retrieve_response_code($response), wp_remote_retrieve_header($response, 'x-gamb-static-context'), 'error' === $kind)) { throw new \RuntimeException('Contexto da origem incompatível com a revalidação.'); }
                 $html = (string)wp_remote_retrieve_body($response);
@@ -110,6 +111,7 @@ final class Gamb_Static_Auditor {
                 $html = Frontend_Policy::postprocess_html(Gamb_Security_Suite::get_instance()->cloak_html_content($html));
                 self::assert_safe($html, $url, 'home' === $kind, true);
             }
+            Operation_Progress::phase('audit',3,3,0,1,'Consolidando os resultados da auditoria.');
             self::save(true);
         } catch (\Throwable $error) {
             if (!self::$findings) { self::$findings[] = array('severity' => 'CRITICAL', 'code' => 'revalidation_failed', 'source' => 'origin'); }
