@@ -1,5 +1,9 @@
 # Registro de validação
 
+## Versão 5.1.1 - 19/11/2026
+
+Mantidas as 172 verificações independentes e 189 com a HTML API. O navegador utilizou a base REST em formato `?rest_route=` contra o WordPress real, conferindo carregamento, navegação e acompanhamento de uma operação com identificador no parâmetro de consulta. Não foi alterada a estrutura de links permanentes do consumidor.
+
 ## Versão 5.1.0 - 19/11/2026
 
 Foram concluídas 172 verificações independentes e 189 com a HTML API do WordPress instalado. Os novos cenários abrangem IPs exatos, IPv4 mapeado em IPv6, cadeias de proxy, spoofing de X-Forwarded-For, validação atômica da configuração, reserva por usuário, concorrência, repetição, histórico, interrupção e revisão da publicação por destino.
