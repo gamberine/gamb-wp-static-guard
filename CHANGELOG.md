@@ -2,6 +2,11 @@
 
 Este documento distingue a incorporação histórica das novas alterações. As datas correspondem ao registro verificável, sem reconstruir datas de commits inexistentes.
 
+## 5.1.1 - 2026-11-19
+
+- Corrigir a composição das consultas de progresso quando a base REST utiliza `?rest_route=`, preservando os parâmetros da rota e do identificador da operação.
+- Validar a navegação, a execução e o percentual no navegador contra os endpoints nativos em modo de links permanentes simples, sem alterar a configuração do site consumidor.
+
 ## 5.1.0 - 2026-11-19
 
 - Integrar o monitor da versão WordPress, com configuração de IPs exatos e proxies confiáveis, normalização IPv4/IPv6 e resposta JSON protegida contra cache.
