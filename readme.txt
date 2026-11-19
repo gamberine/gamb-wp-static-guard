@@ -4,7 +4,7 @@ Tags: static-site, export, security, local-search
 Requires at least: 6.2
 Tested up to: 7.1
 Requires PHP: 8.1
-Stable tag: 5.0.1
+Stable tag: 5.1.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/old-licenses/gpl-2.0.html
 
@@ -37,6 +37,11 @@ Repositório, documentação e versões:
 https://github.com/gamberine/gamb-wp-static-guard
 
 == Registro de versões ==
+
+= 5.1.0 =
+Monitor da versão WordPress integrado, listas de IPs e proxies configuráveis,
+abas no painel, accordion exclusivo, etiquetas de publicação e progresso
+persistente por etapas com percentual no título da aba.
 
 = 5.0.1 =
 Incorporação do ajuste visual do menu administrativo: alinhamento do ícone,

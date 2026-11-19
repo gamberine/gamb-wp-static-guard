@@ -4,7 +4,7 @@
 
 Extensão para WordPress destinada à geração de sites estáticos, à publicação em diretório local ou arquivo ZIP e à redução da exposição de informações técnicas na saída pública.
 
-**Versão de referência:** 5.0.1. **Licença:** GPL-2.0-or-later. **Manutenção:** [gamberine](https://github.com/gamberine).
+**Versão de referência:** 5.1.0. **Licença:** GPL-2.0-or-later. **Manutenção:** [gamberine](https://github.com/gamberine).
 
 ## Finalidade e limites
 
@@ -99,3 +99,6 @@ O script de compilação produz um ZIP instalável e seu resumo SHA-256 em `dist
 ## Registro histórico
 
 As etiquetas `v3.0.0` e `v3.0.1` documentam, respectivamente, a instalação preservada e as sete alterações operacionais incorporadas antes da separação do projeto. São registros históricos, não recomendações de instalação. O código específico de temas consumidores não integra este repositório.
+
+
+Monitor da versão WordPress, abas e acompanhamento operacional: [configuração e limites](docs/VERSION-MONITOR.md).

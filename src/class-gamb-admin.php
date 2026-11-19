@@ -38,10 +38,15 @@ class Admin_Controller {
         wp_enqueue_script( 'gamb-guard-single', GAMB_STATIC_WP_URL . '/assets/admin-ui.js', array(), GAMB_STATIC_WP_VERSION, true );
         wp_localize_script( 'gamb-guard-single', 'gambGuardData', array( 'restUrl' => rest_url( self::API . '/' ), 'nonce' => wp_create_nonce( 'wp_rest' ) ) );
         echo '<button type="button" class="button" data-gamb-single="' . (int) $post->ID . '">Publicar e atualizar listagens</button><p role="status" aria-live="polite" data-gamb-single-message></p>';
+        wp_enqueue_style('gamb-guard-single',GAMB_STATIC_WP_URL . '/assets/admin-ui.css',array(),GAMB_STATIC_WP_VERSION);
     }
     public function register_rest_routes() {
         $permission = static function() { return current_user_can( 'manage_options' ); };
         $routes = array(
+            '/operations' => array('methods'=>'POST','callback'=>static function($request) { return Operation_Progress::create(sanitize_key($request->get_param('kind') ?: '')); }),
+            '/operation-status' => array('methods'=>'GET','callback'=>static function($request) { return Operation_Progress::snapshot((string)($request->get_param('id') ?: '')); }),
+            '/publication-status' => array('methods'=>'GET','callback'=>static function() { return Publication_Status::snapshot(); }),
+            '/version-monitor' => array('methods'=>'GET','callback'=>static function() { return Version_Monitor::status(); }),
             '/settings' => array( array( 'methods' => 'GET', 'callback' => array( $this, 'rest_get_settings' ) ), array( 'methods' => 'POST', 'callback' => array( $this, 'rest_save_settings' ) ) ),
             '/start-export' => array( 'methods' => 'POST', 'callback' => array( $this, 'rest_start_export' ) ),
             '/diagnostics' => array( array( 'methods' => 'GET', 'callback' => array( $this, 'rest_get_diagnostics' ) ), array( 'methods' => 'POST', 'callback' => array( $this, 'rest_run_diagnostics' ) ) ),
@@ -56,6 +61,16 @@ class Admin_Controller {
         foreach ( $routes as $route => $definition ) {
             if ( isset( $definition['methods'] ) ) { $definition['permission_callback'] = $permission; }
             else { foreach ( $definition as &$endpoint ) { $endpoint['permission_callback'] = $permission; } unset( $endpoint ); }
+            $kinds=array('/settings'=>'settings','/start-export'=>'export','/apply-single'=>'single','/diagnostics'=>'diagnostics','/check-updates'=>'updates','/audit'=>'audit','/backup'=>'backup','/backup/delete'=>'backup-delete');
+            $wrap=static function($endpoint) use ($route,$kinds) {
+                if (isset($kinds[$route]) && $endpoint['methods']==='POST') {
+                    $callback=$endpoint['callback']; $kind=$kinds[$route];
+                    $endpoint['callback']=static function($request) use ($callback,$kind) { return Operation_Progress::execute($request,$kind,static function() use ($callback,$request) { return call_user_func($callback,$request); }); };
+                }
+                return $endpoint;
+            };
+            if (isset($definition['methods'])) { $definition=$wrap($definition); }
+            else { $definition=array_map($wrap,$definition); }
             register_rest_route( self::API, $route, $definition );
         }
     }
@@ -79,6 +94,10 @@ class Admin_Controller {
     public function rest_save_settings( $request ) {
         $options = Options::instance(); $defaults = Options::get_default_options();
         $params = $request->get_params();
+        foreach (array('version_monitor_allowed_ips','version_monitor_trusted_proxies') as $key) {
+            if (array_key_exists($key,$params)) { $parsed=Version_Monitor::validate_list($params[$key]); if (is_wp_error($parsed)) { return $parsed; } $params[$key]=$parsed; }
+        }
+        Operation_Progress::phase('settings',1,3,1,1,'Configurações recebidas; validando os campos.');
         if ( isset( $params['github_update_repository'] ) && ( ! is_string( $params['github_update_repository'] ) || ! Gamb_GitHub_Updater::valid_repository( $params['github_update_repository'] ) ) ) { return new \WP_Error( 'invalid_repository', 'Informe owner/repo para o GitHub.', array( 'status' => 400 ) ); }
         if ( isset( $params['github_update_repository'] ) && $params['github_update_repository'] !== $options->get( 'github_update_repository' ) && ! current_user_can( 'update_plugins' ) ) { return new \WP_Error( 'forbidden', 'A configuração requer permissão para atualizar plugins.', array( 'status' => 403 ) ); }
         $new_token = $params['github_update_token'] ?? ''; $clear_token = ! empty( $params['github_clear_token'] );
@@ -96,6 +115,8 @@ class Admin_Controller {
             Gamb_GitHub_Updater::instance()->clear_cache();
             if ( ! Gamb_GitHub_Updater::instance()->set_token( $clear_token ? '' : $new_token ) ) { return new \WP_Error( 'token_encryption', 'Não foi possível criptografar o token. Verifique OpenSSL e o formato informado.', array( 'status' => 400 ) ); }
         }
+        Operation_Progress::phase('settings',2,3,0,1,'Aplicando os campos validados.');
+        $publication_changed=false;
         foreach ( $params as $key => $value ) {
             if ( ! array_key_exists( $key, $defaults ) || strpos( $key, 'last_' ) === 0 || in_array( $key, array( 'archive_status_messages', 'version', 'first_full_export_completed' ), true ) ) { continue; }
             if ( is_bool( $defaults[$key] ) ) { $value = filter_var( $value, FILTER_VALIDATE_BOOLEAN ); }
@@ -103,10 +124,12 @@ class Admin_Controller {
             elseif ( is_array( $defaults[$key] ) ) { $value = is_array( $value ) ? array_map( 'sanitize_text_field', $value ) : array(); }
             elseif ( is_scalar( $value ) ) { $value = sanitize_textarea_field( (string) $value ); }
             else { continue; }
+            if (!str_starts_with($key,'version_monitor_') && !str_starts_with($key,'github_') && $options->get($key)!==$value) { $publication_changed=true; }
             $options->set( $key, $value );
         }
         Gamb_GitHub_Updater::instance()->clear_cache();
-        $options->save(); Gamb_Security_Suite::purge_page_caches();
+        Operation_Progress::phase('settings',3,3,0,1,'Persistindo as configurações e invalidando os caches.');
+        $options->save(); if ($publication_changed) { Publication_Status::changed(); } Gamb_Security_Suite::purge_page_caches();
         return rest_ensure_response( array( 'success' => true ) );
     }
     public function rest_start_export( $request ) { $result = Static_Engine::get_instance()->run_export( sanitize_key( $request->get_param( 'type' ) ?: '' ) ); return new \WP_REST_Response( $result, empty( $result['success'] ) ? 422 : 200 ); }
@@ -119,19 +142,19 @@ class Admin_Controller {
     public function render_admin_page() {
         if ( ! current_user_can( 'manage_options' ) ) { return; }
         $options = Options::instance()->get_all();
-        $diagnostics = Installation_Checks::latest( true );
+        $diagnostics = Installation_Checks::latest();
+        $publication = Publication_Status::snapshot();
         $publication_resources = get_option( Installation_Checks::EXPORT_OPTION, array() );
         $resources = ! empty( $publication_resources ) ? $publication_resources : ( $diagnostics['resources'] ?? array() );
         ?>
         <div class="wrap gamb-admin" id="gamb-guard-admin-app">
-            <header class="gamb-admin-header"><img src="<?php echo esc_url( GAMB_STATIC_WP_URL . '/assets/gamb-wp-static-guard-logo.svg' ); ?>" alt="Gamb WP Static Guard" width="240"><p>Versão <?php echo esc_html( GAMB_STATIC_WP_VERSION ); ?> - Administração de publicação estática e controles de exposição.</p></header>
-            <div id="gamb-toast" role="status" aria-live="polite" hidden></div>
+            <header class="gamb-admin-header"><img src="<?php echo esc_url( GAMB_STATIC_WP_URL . '/assets/gamb-wp-static-guard-logo.svg' ); ?>" alt="Gamb WP Static Guard" width="240"><div><p>Versão <?php echo esc_html( GAMB_STATIC_WP_VERSION ); ?> - Administração de publicação estática e controles de exposição.</p><a class="button gamb-releases-link" href="https://github.com/gamberine/gamb-wp-static-guard/releases/latest" target="_blank" rel="noopener noreferrer">Releases e download no GitHub <span aria-hidden="true">↗</span></a></div></header>
+            <div id="gamb-toast" class="gamb-process" role="status" aria-live="polite" aria-atomic="true" hidden><div class="gamb-process-heading"><strong data-process-label></strong><span data-process-percent></span></div><div class="gamb-progress-track" role="progressbar" aria-label="Progresso das etapas" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span data-process-bar></span></div><p data-process-message></p><small data-process-units></small></div>
             <div class="gamb-layout">
             <aside class="gamb-sidebar" aria-label="Publicação e segurança">
-                <details class="gamb-sidebox" name="gamb-sections" open><summary>1. STATIC/Conversão - HTML/ZIP</summary><nav class="gamb-admin-nav" aria-label="Conversão estática"><button type="button" class="button" data-tab="publication" aria-controls="panel-publication" aria-pressed="true">Publicação e registro</button><button type="button" class="button" data-tab="diagnostics" aria-controls="panel-diagnostics" aria-pressed="false">Diagnóstico da instalação</button><button type="button" class="button" data-tab="settings" aria-controls="panel-settings" aria-pressed="false">Configuração da conversão</button></nav></details>
-                <details class="gamb-sidebox" name="gamb-sections"><summary>2. GUARD/Segurança - Blindado</summary><nav class="gamb-admin-nav" aria-label="Controles de segurança"><button type="button" class="button" data-tab="guard" aria-controls="panel-guard" aria-pressed="false">Controles de exposição</button><button type="button" class="button" data-tab="updates" aria-controls="panel-updates" aria-pressed="false">Atualizações e auditoria</button><button type="button" class="button" data-tab="backup" aria-controls="panel-backup" aria-pressed="false">Gerenciador de backups</button></nav></details>
-                <section class="gamb-sidebox gamb-scope-box" aria-labelledby="gamb-scope-heading">
-                    <h2 id="gamb-scope-heading">Selecione o Escopo de Conversão</h2>
+                <details class="gamb-sidebox" name="gamb-sections" open><summary><span>1. STATIC/Conversão</span><span class="gamb-badge" data-tone="success">HTML/ZIP</span></summary><nav class="gamb-admin-nav" aria-label="Conversão estática"><button type="button" class="button" data-tab="publication" aria-controls="panel-publication" aria-pressed="true">Publicação e registro</button><button type="button" class="button" data-tab="diagnostics" aria-controls="panel-diagnostics" aria-pressed="false">Diagnóstico da instalação</button><button type="button" class="button" data-tab="settings" aria-controls="panel-settings" aria-pressed="false">Configuração da conversão</button></nav></details>
+                <details class="gamb-sidebox" name="gamb-sections"><summary><span>2. GUARD/Segurança</span><span class="gamb-badge" data-tone="success">Blindado</span></summary><nav class="gamb-admin-nav" aria-label="Controles de segurança"><button type="button" class="button" data-tab="guard" aria-controls="panel-guard" aria-pressed="false">Controles de exposição</button><button type="button" class="button" data-tab="updates" aria-controls="panel-updates" aria-pressed="false">Atualizações e auditoria</button><button type="button" class="button" data-tab="monitor" aria-controls="panel-monitor" aria-pressed="false">Monitor da versão WP</button><button type="button" class="button" data-tab="backup" aria-controls="panel-backup" aria-pressed="false">Gerenciador de backups</button></nav></details>
+                <details class="gamb-sidebox gamb-scope-box" name="gamb-sections"><summary id="gamb-scope-heading"><span>Selecione o Escopo de Conversão</span><span class="gamb-badge" data-publication-badge data-tone="<?php echo esc_attr($publication['tone']); ?>"><?php echo esc_html($publication['label']); ?></span></summary><div class="gamb-scope-content"><p data-publication-message><?php echo esc_html($publication['message']); ?></p>
                     <label class="screen-reader-text" for="gamb-quick-scope">Escopo de conversão</label>
                     <select id="gamb-quick-scope" aria-describedby="gamb-scope-help">
                         <option value="theme" <?php disabled( ! $options['first_full_export_completed'] ); ?> <?php selected( $options['first_full_export_completed'] && 'theme' === $options['generate_type'] ); ?>>Somente arquivos do tema (sem páginas/html)</option>
@@ -141,7 +164,7 @@ class Admin_Controller {
                     <p id="gamb-scope-help">Somente os arquivos do tema não geram páginas HTML e não são suficientes para publicar um site navegável. Atualizar site reconstrói a publicação completa.</p>
                     <p data-first-full-notice <?php if ( $options['first_full_export_completed'] ) : ?>hidden<?php endif; ?>><strong>A primeira publicação deve ser Site Completo. As outras opções serão liberadas após a conclusão.</strong></p>
                     <button type="button" class="button button-primary gamb-run-export-btn">Converter &amp; Publicar Agora</button>
-                </section>
+                </div></details>
             </aside>
             <div class="gamb-content">
             <section class="gamb-panel" id="panel-publication" aria-labelledby="gamb-publication-heading">
@@ -175,6 +198,14 @@ class Admin_Controller {
             <section class="gamb-panel" id="panel-guard" hidden><h2>Controles de exposição</h2><p>Os recursos publicados continuam públicos. Endereços opacos reduzem a identificação de caminhos; não substituem autenticação, autorização ou análise de segurança.</p>
                 <?php foreach ( array( 'guard_active_on_live_site' => 'Aplicar tratamento também nas páginas públicas da origem', 'guard_universal_token_cloaking' => 'Reescrever recursos para endereços opacos', 'guard_strict_static_html' => 'Interromper entrega com referências internas não resolvidas', 'guard_clean_body_classes' => 'Remover classes nativas do corpo, após validar a dependência do tema', 'guard_remove_block_styles' => 'Remover estilos nativos de blocos, somente se o tema não os utilizar', 'hide_comments' => 'Remover comentários HTML na saída pública', 'guard_security_headers' => 'Aplicar cabeçalhos de segurança', 'guard_restrict_rest_api' => 'Restringir consulta anônima aos recursos administrativos da API' ) as $key => $label ) { $this->checkbox( $key, $label, $options ); } ?>
                 <button type="button" class="button button-primary gamb-save-settings-btn">Salvar configurações</button>
+            </section>
+            <section class="gamb-panel" id="panel-monitor" hidden aria-labelledby="gamb-monitor-heading"><h2 id="gamb-monitor-heading">Monitor da versão WordPress</h2><p>Disponibiliza a versão em JSON somente para IPs exatos autorizados. Uma lista vazia bloqueia todas as origens. O acesso administrativo não dispensa essa restrição.</p>
+                <?php $this->checkbox('version_monitor_enabled','Habilitar o monitor da versão WordPress',$options); ?>
+                <label class="gamb-field" for="gamb-monitor-ips">IPs autorizados — um IPv4 ou IPv6 por linha</label><textarea class="large-text code" rows="6" id="gamb-monitor-ips" data-opt="version_monitor_allowed_ips"><?php echo esc_textarea(implode("\n",(array)$options['version_monitor_allowed_ips'])); ?></textarea>
+                <label class="gamb-field" for="gamb-monitor-proxies">Proxies explicitamente confiáveis — um IP por linha</label><textarea class="large-text code" rows="4" id="gamb-monitor-proxies" data-opt="version_monitor_trusted_proxies"><?php echo esc_textarea(implode("\n",(array)$options['version_monitor_trusted_proxies'])); ?></textarea>
+                <p>Deixe proxies vazios em conexões diretas. X-Forwarded-For só é considerado quando a conexão vem de um proxy informado. Não são aceitos CIDR, curingas, nomes de host ou autorização automática de loopback.</p>
+                <button type="button" class="button button-primary gamb-save-settings-btn">Salvar configurações</button>
+                <h3>Endereços de consulta</h3><p><a data-monitor-url href="<?php echo esc_url(rest_url('gamb-wp-static-guard/v1/wordpress-version')); ?>" target="_blank" rel="noopener noreferrer"><?php echo esc_html(rest_url('gamb-wp-static-guard/v1/wordpress-version')); ?></a></p><p class="gamb-wrap-anywhere">Compatibilidade: <code><?php echo esc_html(rest_url('monitor-versao-wp')); ?></code> e <code><?php echo esc_html(rest_url('monitor-versao-wp/check')); ?></code>. A rota antiga <code>/meu-sistema/v1/versao</code> permanece removida.</p><p data-monitor-status></p><button type="button" class="button" data-test-monitor>Verificar acesso desta origem</button><pre data-monitor-result class="gamb-monitor-result"></pre>
             </section>
             <section class="gamb-panel" id="panel-backup" hidden><h2>Gerenciador de backups</h2><p>São mantidas somente as seis cópias de segurança mais recentes, considerando todos os tipos. A retenção é aplicada após a conclusão de uma nova cópia.</p><p>O pacote de banco, tema e extensões não inclui uploads nem a instalação completa. A restauração é manual.</p><button type="button" class="button gamb-create-backup-btn" data-backup-type="db">Gerar cópia do banco</button> <button type="button" class="button gamb-create-backup-btn" data-backup-type="full">Gerar banco, tema e extensões</button><div class="gamb-backup-list" data-backup-list></div></section>
             <section class="gamb-panel" id="panel-updates" hidden aria-labelledby="gamb-updates-heading">

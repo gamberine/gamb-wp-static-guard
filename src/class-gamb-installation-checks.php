@@ -208,6 +208,7 @@ class Installation_Checks {
     }
 
     public static function run() {
+        Operation_Progress::phase('diagnostics',1,4,0,1,'Verificando requisitos da instalação.');
         $checks = array(); $audit = new self();
         $add = static function( $id, $status, $message ) use ( &$checks ) { $checks[] = array( 'id' => $id, 'status' => $status, 'message' => $message ); };
         $native_parser = class_exists( '\\Dom\\HTMLDocument' );
@@ -221,6 +222,7 @@ class Installation_Checks {
         $add( 'first_export', 'ok', Options::instance()->get( 'first_full_export_completed', false ) ? 'Primeira publicação completa já concluída.' : 'A primeira publicação será completa; os outros escopos serão liberados após a entrega.' );
         if ( Options::instance()->get( 'auto_export', true ) && defined( 'DISABLE_WP_CRON' ) && DISABLE_WP_CRON ) { $add( 'cron', 'warning', 'O agendador por visitas está desabilitado. A atualização automática requer agendador externo configurado.' ); }
         foreach ( array( 'home' => home_url( '/' ), 'error' => home_url( '/gamb-static-guard-missing-page-404/' ) ) as $kind => $url ) {
+            Operation_Progress::phase('diagnostics','home' === $kind ? 2 : 3,4,0,1,'Consultando a origem: ' . $kind . '.');
             $response = wp_remote_get( $url, array( 'timeout' => 15, 'redirection' => 0, 'limit_response_size' => 2097152, 'headers' => array( 'X-Gamb-Static-Export' => Frontend_Policy::export_context_token() ) ) );
             if ( is_wp_error( $response ) ) { $add( $kind, 'error', 'Não foi possível consultar a origem: ' . $kind . '. Verifique o acesso HTTP local.' ); continue; }
             $status = (int) wp_remote_retrieve_response_code( $response );
@@ -235,6 +237,7 @@ class Installation_Checks {
                 $add( 'canonical', 1 === $canonical_count ? 'ok' : 'warning', 1 === $canonical_count ? 'Canonical da Home presente.' : ( 0 === $canonical_count && Options::instance()->get( 'ensure_home_canonical', true ) ? 'Canonical ausente na origem; será acrescentado à Home exportada.' : 'Revise os canonicals da Home no tema ou na extensão de SEO.' ) );
             }
         }
+        Operation_Progress::phase('diagnostics',4,4,0,1,'Consolidando requisitos e dependências.');
         $has_theme_error = (bool) locate_template( '404.php' );
         $add( 'error_template', $has_theme_error ? 'ok' : 'warning', $has_theme_error ? 'O modelo 404 do tema será preservado.' : 'Temas clássicos sem modelo 404 recebem o modelo de apoio quando usam o fallback index.php. Modelos de blocos e de outras extensões são preservados.' );
         $dependencies = $audit->dependency_report();

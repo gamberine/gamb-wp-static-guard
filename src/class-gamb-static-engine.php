@@ -65,6 +65,7 @@ class Static_Engine {
 	 * @return array<string,mixed> Resultado detalhado da exportação.
 	 */
 	public function run_export( $scope = "", $post_id = 0 ) {
+		if (!Operation_Progress::active()) { return Operation_Progress::background_export(function() use ($scope,$post_id) { return $this->run_export($scope,$post_id); }); }
 		$lock = @fopen( get_temp_dir() . 'gamb-static-' . md5( ABSPATH ) . '.lock', 'c' );
 		if ( ! $lock || ! flock( $lock, LOCK_EX | LOCK_NB ) ) {
 			if ( $lock ) { fclose( $lock ); }
@@ -88,6 +89,8 @@ class Static_Engine {
 	}
 
 	private function perform_export( $scope, $post_id ) {
+		$source_revision=Publication_Status::revision();
+		Operation_Progress::phase('export',1,6,0,1,'Validando a origem e preparando a publicação.');
 		Gamb_Static_Auditor::begin();
 		$opts = Options::instance();
 		if ( "" === $scope ) {
@@ -146,6 +149,7 @@ class Static_Engine {
 		$dependency_audit = new Installation_Checks();
 
 		// 1. Sempre registra e materializa os ativos do tema (CSS, JS, fontes, imagens do layout)
+		Operation_Progress::phase('export',2,6,0,1,'Processando os recursos do tema.');
 		$guard->register_all_theme_assets_as_tokens();
 
 		// Copia também para /static/ui/ como fallback estrutural
@@ -156,10 +160,12 @@ class Static_Engine {
 
 		// 2. Se o escopo NÃO for "Somente o Tema", busca e converte as páginas HTML selecionadas
 		if ( "theme" !== $scope ) {
+			Operation_Progress::phase('export',3,6,0,1,'Descobrindo as páginas públicas.');
 			$urls = $this->discover_urls_for_scope( $scope, (int) $post_id );
 			self::log_activity( sprintf( "Rastreamento concluído: %d páginas identificadas para conversão HTML.", count( $urls ) ) );
 
 			for ( $cursor = 0; $cursor < count( $urls ); $cursor++ ) {
+				Operation_Progress::phase('export',3,6,$cursor,count($urls),'Convertendo páginas públicas.');
 				$url_info = $urls[ $cursor ];
 				$url      = $url_info["url"];
 				$rel_file = $url_info["rel_file"];
@@ -238,6 +244,7 @@ class Static_Engine {
 			copy( GAMB_STATIC_WP_PATH . 'assets/static-search.js', $archive_dir . 'static/search.js' );
 		}
 		// 3. Materializa todos os tokens criptografados (/v/<token> e /v/d/<token>/) no diretório estático
+		Operation_Progress::phase('export',4,6,0,1,'Materializando recursos e conferindo a integridade.');
 		$tokens_cnt   = $guard->materialize_cloaked_assets_in_archive( $archive_dir );
 		$exported_cnt += $tokens_cnt;
 		Installation_Checks::finalize_integrity( $archive_dir );
@@ -250,13 +257,15 @@ class Static_Engine {
 
 		// 5. Entrega no destino configurado (ZIP, Diretório Local, GitHub, AWS S3, FTP, SFTP)
 		$delivery_method = (string) $opts->get( "delivery_method", "zip" );
+		Operation_Progress::phase('export',5,6,0,1,'Entregando os arquivos no destino configurado.');
 		$deploy_result   = $this->deliver_archive( $archive_dir, $delivery_method, $scope );
 		if ( is_wp_error( $deploy_result ) ) {
 			self::log_activity( $deploy_result->get_error_message() );
 			return array( 'success' => false, 'message' => $deploy_result->get_error_message() );
 		}
 
-		if ( 'export' === $scope ) { $opts->set( 'first_full_export_completed', true ); }
+		Operation_Progress::phase('export',6,6,0,1,'Registrando a publicação e notificando a conclusão.');
+		if ( 'export' === $scope ) { Publication_Status::complete($source_revision); $opts->set( 'first_full_export_completed', true ); }
 		$now_str = date_i18n( "d/m/Y H:i:s" );
 		$opts->set( "last_export_time", $now_str )
 			->set( "last_export_scope", $scope_label )
@@ -546,7 +555,9 @@ class Static_Engine {
 			new \RecursiveDirectoryIterator( $src_dir, \RecursiveDirectoryIterator::SKIP_DOTS )
 		);
 
-		foreach ( $iterator as $path => $info ) {
+		$items=iterator_to_array($iterator); $total_items=count($items); $processed_items=0;
+		foreach ( $items as $path => $info ) {
+			Operation_Progress::phase('export',2,6,$processed_items++,$total_items,'Processando os arquivos do tema.');
 			if ( ! $info->isFile() || $info->isLink() ) {
 				continue;
 			}
@@ -636,6 +647,7 @@ class Static_Engine {
 						$zip->addFile( $path, $rel );
 					}
 				}
+				if (method_exists($zip,'registerProgressCallback')) { $zip->registerProgressCallback(0.02,static function($ratio) { Operation_Progress::phase('export',5,6,(int)round($ratio*10000),10000,'Compactando o pacote estático.'); }); }
 				$zip->close();
 			}
 		} else {
@@ -721,6 +733,7 @@ class Static_Engine {
 	}
 
 	private function copy_directory_all( $src, $dst ) {
+		$copy_total=iterator_count(new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($src,\FilesystemIterator::SKIP_DOTS))); $copied=0;
 		$base_len = strlen( rtrim( $src, "/\\" ) ) + 1;
 		$iterator = new \RecursiveIteratorIterator(
 			new \RecursiveDirectoryIterator( $src, \RecursiveDirectoryIterator::SKIP_DOTS )
@@ -734,6 +747,7 @@ class Static_Engine {
 				$base = trailingslashit( wp_normalize_path( realpath( $dst ) ) );
 				if ( ! $parent || is_link( $dest ) || 0 !== strpos( strtolower( trailingslashit( wp_normalize_path( $parent ) ) ), strtolower( $base ) ) ) { return false; }
 				if ( ! @copy( $path, $dest ) ) { return false; }
+				Operation_Progress::phase('export',5,6,++$copied,$copy_total,'Copiando arquivos para o destino local.');
 			}
 		}
 		return true;

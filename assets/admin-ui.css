@@ -1,4 +1,8 @@
 .gamb-admin {
+    --gamb-accent: #3346b0;
+    --gamb-success: #187441;
+    --gamb-danger: #b42318;
+    --gamb-warning: #875400;
     max-width: 1160px;
     color    : #172b40;
 }
@@ -28,7 +32,8 @@
     padding      : 18px;
     margin       : 0 0 16px;
     background   : #fff;
-    border       : 1px solid #c5cdd5;
+    border       : 1px solid #dce5ee;
+    box-shadow   : 0px 0px 13px -5px #cdcdcd2b;
     border-radius: 6px;
 }
 
@@ -89,13 +94,25 @@
     overflow-wrap: anywhere;
 }
 
-.gamb-admin-header,
+.gamb-admin-header {
+    padding      : 24px;
+    margin       : 16px 0;
+    background   : #fff;
+    border       : 1px solid #dce5ee;
+    box-shadow   : 0px 0px 13px -5px #cdcdcd2b;
+    border-radius: 6px;
+    flex-wrap    : nowrap;
+    display      : flex;
+    gap          : 2rem;
+}
+
 .gamb-panel {
     padding      : 24px;
     margin       : 16px 0;
     background   : #fff;
-    border       : 1px solid #c5cdd5;
     border-radius: 6px;
+    border       : 1px solid #dce5ee;
+    box-shadow   : 0px 0px 13px -5px #cdcdcd2b;
 }
 
 .gamb-admin-header img {
@@ -137,16 +154,20 @@
 
 .gamb-admin .gamb-setting {
     display    : flex;
-    align-items: start;
+    align-items: center;
     gap        : 8px;
-    margin     : 18px 0;
-    line-height: 1.6;
+    margin     : 0;
+    line-height: 2.2;
 }
 
 .gamb-admin fieldset {
-    border : 1px solid #c5cdd5;
-    padding: 14px;
-    margin : 24px 0;
+    border   : 1px solid #c5cdd5;
+    padding  : 19px 14px;
+    margin   : 1rem 0;
+    display  : flex;
+    gap      : 2rem;
+    row-gap  : 1rem;
+    flex-wrap: wrap;
 }
 
 .gamb-admin legend {
@@ -154,37 +175,63 @@
 }
 
 .toplevel_page_gamb-wp-static-guard div.wp-menu-image {
-  display: flex;
-  align-items: center;
-  justify-content: center;
+    display        : flex;
+    align-items    : center;
+    justify-content: center;
 }
 
 .toplevel_page_gamb-wp-static-guard .wp-menu-image img {
     padding: 0 !important;
-    opacity: 1 ;
+    opacity: 1;
 }
 
-.toplevel_page_gamb-wp-static-guard div.wp-menu-name {
-  padding: 8px 0 8px 36px;
-  color: #6678ff;
-  font-weight: 600;
-  line-height: 1.2;
+li#toplevel_page_gamb-wp-static-guard>a>div.wp-menu-name,
+li#toplevel_page_gamb-duplica-wp>a>div {
+    padding    : 8px 0 8px 36px;
+    color      : #6678ff;
+    font-weight: 600;
+    line-height: 1.2;
 }
 
 .gamb-stats {
-    display  : flex;
-    gap      : 36px;
-    flex-wrap: wrap;
-    margin   : 28px 0;
+    color      : #6678ff;
+    display    : flex;
+    font-weight: 600;
+    gap        : 2.5rem;
+    flex-wrap  : wrap;
+    margin     : 28px 0;
+}
+
+#gamb-guard-admin-app input[type=checkbox],
+#gamb-guard-admin-app input[type=radio] {
+    border-radius     : 6px;
+    line-height       : 0;
+    height            : 1rem;
+    margin            : 0;
+    padding           : 0 !important;
+    text-align        : center;
+    vertical-align    : middle;
+    width             : 1rem;
+    min-width         : 1rem;
+    -webkit-appearance: none;
+    -moz-appearance   : none;
+    appearance        : none;
+    box-shadow        : none;
+    transition        : .05s border-color ease-in-out;
 }
 
 .gamb-stats dt {
-    font-weight  : 600;
-    margin-bottom: 10px;
+    font-weight  : 700;
+    margin-bottom: 5px;
+    font-size    : 110%;
+    text-align   : center;
 }
 
 .gamb-stats dd {
-    margin: 0;
+    margin     : 0;
+    text-align : center;
+    font-weight: 400;
+    color      : #173923;
 }
 
 #gamb-toast {
@@ -206,10 +253,14 @@
     overflow  : auto;
 }
 
-.gamb-admin :is(button, input, select, a):focus-visible {
-    outline       : 3px solid #1768ac;
-    outline-offset: 3px;
+.gamb-admin button,
+.gamb-admin input,
+.gamb-admin select,
+.gamb-admin textarea {
+    border-radius: 6px !important;
 }
+
+
 
 @media (max-width: 1050px) {
     .gamb-layout {
@@ -232,3 +283,94 @@
         max-width: 100%;
     }
 }
+
+/* Navegação e estados da versão 5.1.0. O foco nativo do WordPress é preservado. */
+.gamb-sidebox summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    list-style: none;
+}
+.gamb-sidebox summary::-webkit-details-marker { display: none; }
+.gamb-sidebox summary::after {
+    content: "";
+    width: 6px;
+    height: 6px;
+    border-right: 1.5px solid currentColor;
+    border-bottom: 1.5px solid currentColor;
+    transform: rotate(45deg);
+    flex: 0 0 auto;
+}
+.gamb-sidebox[open] > summary::after { transform: rotate(225deg); }
+.gamb-sidebox summary > span:first-child { min-width: 0; }
+.gamb-badge {
+    margin-left: auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    flex: 0 0 auto;
+    white-space: nowrap;
+    padding: 1px 6px;
+    font-size: 9px;
+    line-height: 1.6;
+    font-weight: 600;
+    border: 1px solid var(--gamb-success);
+    color: var(--gamb-success);
+    background: transparent;
+    border-radius: 8px;
+}
+.gamb-badge::before { content: ""; width: 4px; height: 4px; border-radius: 50%; background: currentColor; }
+.gamb-badge[data-tone=warning] { color: var(--gamb-warning); border-color: currentColor; }
+.gamb-badge[data-tone=neutral] { color: #526273; border-color: currentColor; }
+.gamb-admin-nav { gap: 4px; }
+.gamb-admin-nav .gamb-tab {
+    width: 100%;
+    text-align: left;
+    padding: 9px 12px;
+    white-space: normal;
+    line-height: 1.5;
+    border: 1px solid transparent;
+    border-left: 3px solid transparent;
+    background: transparent;
+    color: #24364a;
+    transition: background-color .15s ease, color .15s ease;
+}
+.gamb-admin-nav .gamb-tab:hover { background: #edf0ff; color: #253792; border-left-color: #6678ff; }
+.gamb-admin-nav .gamb-tab[aria-selected=true] { background: var(--gamb-accent); border-color: var(--gamb-accent); border-left-color: #94a1ff; color: #fff; }
+.gamb-scope-content { margin-top: 16px; }
+.gamb-scope-box summary { font-size: 13px; }
+.gamb-admin-header > div { min-width: 0; }
+.gamb-admin-header > img { flex: 0 1 240px; min-width: 0; object-fit: contain; }
+.gamb-admin-header p { margin-top: 0; }
+.gamb-wrap-anywhere, .gamb-monitor-result { overflow-wrap: anywhere; word-break: break-word; }
+.gamb-monitor-result { white-space: pre-wrap; max-height: 360px; overflow: auto; }
+.gamb-admin textarea { box-sizing: border-box; max-width: 100%; }
+#gamb-toast.gamb-process, .gamb-process {
+    --process-color: #3346b0;
+    position: sticky;
+    top: 38px;
+    z-index: 50;
+    box-sizing: border-box;
+    padding: 16px 20px;
+    border: 1px solid #c9d1e2;
+    border-left: 4px solid var(--process-color);
+    border-radius: 8px;
+    color: #223349;
+    background: #f6f8ff;
+    box-shadow: 0 4px 18px #14243e16;
+    margin: 16px 0;
+}
+.gamb-process-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.gamb-process [data-process-percent] { color: var(--process-color); font-weight: 700; font-variant-numeric: tabular-nums; }
+.gamb-progress-track { height: 7px; overflow: hidden; border-radius: 8px; background: #dce2ef; margin: 10px 0; }
+.gamb-progress-track > span { display: block; width: 0; height: 100%; border-radius: inherit; background-color: var(--process-color); transition: width .2s ease; }
+.gamb-process[aria-busy=true] .gamb-progress-track > span { background-image: linear-gradient(110deg,transparent 25%,#ffffff40 50%,transparent 75%); background-size: 60px 100%; animation: gamb-progress-flow 1.3s linear infinite; }
+.gamb-process p { margin: 8px 0 4px; }
+.gamb-process small { display: block; line-height: 1.6; }
+#gamb-toast[data-state=success], .gamb-process[data-state=success] { --process-color: #187441; background: #f2faf5; border-color: #a6cfb5; border-left-color: var(--process-color); }
+#gamb-toast[data-state=error], .gamb-process[data-state=error] { --process-color: #b42318; background: #fff4f2; border-color: #e7b6af; border-left-color: var(--process-color); }
+#gamb-toast[data-state=warning], .gamb-process[data-state=warning] { --process-color: #875400; background: #fff9ee; border-color: #dec697; border-left-color: var(--process-color); }
+@keyframes gamb-progress-flow { to { background-position: 60px 0; } }
+@media (max-width: 782px) { .gamb-admin-header { flex-wrap: wrap; gap: 20px; } .gamb-process { top: 52px; } }
+@media (prefers-reduced-motion: reduce) { .gamb-progress-track > span { transition: none; animation: none !important; } .gamb-admin-nav .gamb-tab { transition: none; } }

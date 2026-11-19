@@ -1,5 +1,13 @@
 # Registro de validação
 
+## Versão 5.1.0 - 19/11/2026
+
+Foram concluídas 172 verificações independentes e 189 com a HTML API do WordPress instalado. Os novos cenários abrangem IPs exatos, IPv4 mapeado em IPv6, cadeias de proxy, spoofing de X-Forwarded-For, validação atômica da configuração, reserva por usuário, concorrência, repetição, histórico, interrupção e revisão da publicação por destino.
+
+A integração WordPress confirmou os endpoints principal e de compatibilidade, resposta JSON autorizada, recusa de origem não autorizada mesmo diante de resposta antecipada de cache e cabeçalhos no-store. A interface foi conferida em 1440 e 390 px, com abas, etiquetas, exclusividade dos accordions, barra e percentual no título. A exportação utilizou um destino isolado e concluiu 213 arquivos processados, com consulta simultânea de percentuais intermediários. A cópia SQL de teste utilizou diretório isolado, preservando os backups existentes.
+
+O percentual mede etapas executadas, não tempo restante. A extensão ZIP nativa não estava disponível no ambiente local; a cópia de banco usou SQL. A matriz de integração contínua mantém PHP 8.1 a 8.4 e WordPress 6.2 e distribuição estável corrente. Consulte o resultado do commit no GitHub Actions e os limites em VERSION-MONITOR.md.
+
 ## Versão 5.0.1 - 18/11/2026
 
 Pacote de manutenção destinado à incorporação do CSS administrativo existente na instalação consumidora. A comparação preserva as regras anteriores e identifica três regras adicionais relativas ao menu. Os metadados de versão são atualizados em conjunto.
