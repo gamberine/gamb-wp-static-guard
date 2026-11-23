@@ -60,14 +60,14 @@ final class Gamb_Static_Sanitizer {
                 $attribute = 'script' === $tag ? 'src' : 'href';
                 $url = Gamb_DOM_Parser::attribute($element, $attribute);
                 if ('' !== $url) {
-                    $url = remove_query_arg('ver', $url); $element->setAttribute($attribute, $url);
+                    if (!Installation_Checks::external_url($url)) { $url = remove_query_arg('ver', $url); $element->setAttribute($attribute, $url); }
                     if (Installation_Checks::external_url($url)) {
                         $absolute = str_starts_with($url, '//') ? 'https:' . $url : $url;
                         $parts = wp_parse_url($absolute);
                         if (!empty($parts['host']) && strtolower($parts['scheme'] ?? '') === 'https') {
                             $origin = 'https://' . strtolower($parts['host']) . (isset($parts['port']) ? ':' . $parts['port'] : ''); $origins[$origin] = true;
                             if (!('link' === $tag && strtolower($parts['host']) === 'fonts.googleapis.com')) {
-                                if (!preg_match('/(?:^|\s)sha384-[A-Za-z0-9+\/]{64}(?:\s|$)/D', Gamb_DOM_Parser::attribute($element, 'integrity'))) { $element->setAttribute('integrity', self::remote_integrity($absolute)); }
+                                if (!preg_match('/^(?:sha(?:256|384|512)-[A-Za-z0-9+\/=]+\s*)+$/D', Gamb_DOM_Parser::attribute($element, 'integrity'))) { $element->setAttribute('integrity', self::remote_integrity($absolute)); }
                                 $element->setAttribute('crossorigin', 'anonymous');
                             }
                         } else { throw new \RuntimeException('CRITICAL: dependência externa de script ou estilo sem HTTPS.'); }

@@ -188,6 +188,7 @@ class Static_Engine {
 
 				// Aplica substituição de URLs conforme modo selecionado (relative, absolute, offline)
 				$processed_html = $this->apply_url_replacement_mode( $processed_html, $rel_file );
+				$processed_html = Installation_Checks::finalize_document( $processed_html, $rel_file );
 
 				// Coleta dados para o índice de busca local busca local
 				if ( $opts->get( "use_search", true ) && "404.html" !== $rel_file ) {
@@ -499,43 +500,60 @@ class Static_Engine {
 		return (string) wp_remote_retrieve_body( $resp );
 	}
 
-	public function apply_url_replacement_mode( $html, $rel_file ) {
+	/** URL pública também para canonical em modos relativo e offline. */
+	public function public_base_url() {
 		$opts = Options::instance();
-		$mode = (string) $opts->get( "destination_url_type", "relative" );
-		$home = untrailingslashit( home_url() );
-		// WordPress can use /index.php/ permalinks; the static site has no PHP router.
-		$html = str_replace( $home . '/index.php/', $home . '/', $html );
+		$home = wp_parse_url( home_url( '/' ) );
+		$host = trim( (string) $opts->get( 'destination_host', '' ), '/\\' );
+		$base = '' !== $host ? (string) $opts->get( 'destination_scheme', 'https://' ) . $host : $home['scheme'] . '://' . $home['host'] . ( isset( $home['port'] ) ? ':' . $home['port'] : '' );
+		$parts = wp_parse_url( $base );
+		if ( ! $parts || ! in_array( $parts['scheme'] ?? '', array( 'http', 'https' ), true ) || empty( $parts['host'] ) || isset( $parts['user'] ) || isset( $parts['pass'] ) || isset( $parts['query'] ) || isset( $parts['fragment'] ) ) { throw new \RuntimeException( 'Configure uma URL pública válida para o destino.' ); }
+		$path = trim( (string) ( $parts['path'] ?? '' ), '/' );
+		if ( '' === $path ) { $path = trim( (string) $opts->get( 'relative_path', '' ), '/' ); }
+		return $parts['scheme'] . '://' . $parts['host'] . ( isset( $parts['port'] ) ? ':' . $parts['port'] : '' ) . '/' . ( '' !== $path ? $path . '/' : '' );
+	}
 
-		if ( "absolute" === $mode ) {
-			$scheme = (string) $opts->get( "destination_scheme", "https://" );
-			$host   = trim( (string) $opts->get( "destination_host", "" ), "/\\" );
-			if ( "" !== $host ) {
-				$target = $scheme . $host;
-				$html   = str_replace( $home, $target, $html );
-			}
-		} elseif ( "offline" === $mode ) {
-			$depth  = substr_count( ltrim( str_replace( "\\", "/", $rel_file ), "/" ), "/" );
-			$prefix = $depth > 0 ? str_repeat( "../", $depth ) : "./";
-			$html   = str_replace( $home . "/", $prefix, $html );
-		} else {
-			// Modo relativo (padrão seguro: oculta o domínio de origem do WordPress)
-			$subpath = trim( (string) $opts->get( "relative_path", "" ), "/" );
-			$repl    = "" !== $subpath ? "/" . $subpath : "";
-			$origin_path = rtrim( (string) parse_url( $home, PHP_URL_PATH ), '/' );
-			if ( '' !== $origin_path ) {
-				$already_target = '';
-				if ( 0 === strpos( $repl, $origin_path . '/' ) ) {
-					$already_target = '(?!' . preg_quote( substr( $repl, strlen( $origin_path ) + 1 ), '#' ) . '/)';
-				}
-				$html = preg_replace( '#(?<=["\'\s(=])' . preg_quote( $origin_path, '#' ) . '/' . $already_target . '#', $repl . '/', $html );
-			}
-			$html    = str_replace( array( $home, str_replace( '/', '\\/', $home ) ), array( $repl, str_replace( '/', '\\/', $repl ) ), $html );
-		}
+	public static function same_origin( $first, $second ) {
+		$a = wp_parse_url( $first ); $b = wp_parse_url( $second );
+		return $a && $b && strtolower( $a['scheme'] ?? '' ) === strtolower( $b['scheme'] ?? '' ) && strtolower( $a['host'] ?? '' ) === strtolower( $b['host'] ?? '' ) && ( $a['port'] ?? ( 'https' === ( $a['scheme'] ?? '' ) ? 443 : 80 ) ) === ( $b['port'] ?? ( 'https' === ( $b['scheme'] ?? '' ) ? 443 : 80 ) );
+	}
 
-		return $html;
+	public function apply_url_replacement_mode( $html, $rel_file ) {
+		$mode = (string) Options::instance()->get( 'destination_url_type', 'relative' );
+		$home = home_url( '/' ); $target = $this->public_base_url();
+		$source_path = rtrim( (string) wp_parse_url( $home, PHP_URL_PATH ), '/' );
+		$target_path = rtrim( (string) wp_parse_url( $target, PHP_URL_PATH ), '/' );
+		$depth = substr_count( ltrim( str_replace( '\\', '/', $rel_file ), '/' ), '/' );
+		$prefix = 'absolute' === $mode ? rtrim( $target, '/' ) : ( 'offline' === $mode ? ( $depth ? str_repeat( '../', $depth ) : './' ) : $target_path );
+		// Canonicals are metadata, never navigation: preserve their absolute URLs.
+		$canonicals = array();
+		$html = preg_replace_callback( '~<link\b(?:[^>"\x27]|"[^"]*"|\x27[^\x27]*\x27)*>~i', static function( $m ) use ( &$canonicals ) {
+			if ( ! Installation_Checks::canonical_tag( $m[0] ) ) { return $m[0]; }
+			$key = '<!--GAMB_CANONICAL_' . count( $canonicals ) . '-->'; $canonicals[$key] = $m[0]; return $key;
+		}, $html );
+		$rewrite = static function( $url ) use ( $home, $target, $source_path, $target_path, $prefix, $mode ) {
+			$resolved = str_starts_with( $url, '//' ) ? wp_parse_url( $home, PHP_URL_SCHEME ) . ':' . $url : $url;
+			$parts = wp_parse_url( $resolved );
+			if ( ! $parts || isset( $parts['user'] ) || isset( $parts['pass'] ) ) { return $url; }
+			$path = $parts['path'] ?? '/';
+			$absolute = isset( $parts['host'] );
+			// Already exported URLs must be idempotent, including a destination inside the source path.
+			if ( $target_path !== $source_path && '' !== $target_path && ( $path === $target_path || str_starts_with( $path, $target_path . '/' ) ) && ( ! $absolute || self::same_origin( $resolved, $target ) ) ) { return $url; }
+			if ( $absolute && ! self::same_origin( $resolved, $home ) ) { return $url; }
+			if ( $path !== $source_path && ! str_starts_with( $path, $source_path . '/' ) ) { return $url; }
+			$relative = substr( $path, strlen( $source_path ) );
+			$relative = preg_replace( '~^/index\.php/~', '/', $relative );
+			$suffix = ( isset( $parts['query'] ) ? '?' . $parts['query'] : '' ) . ( isset( $parts['fragment'] ) ? '#' . $parts['fragment'] : '' );
+			return ( 'offline' === $mode ? $prefix . ltrim( $relative, '/' ) : $prefix . ( '' === $relative ? '/' : $relative ) ) . $suffix;
+		};
+		// Consume entire absolute URLs first; never match a source-looking path inside an external URL.
+		$html = preg_replace_callback( '~(?<![A-Za-z0-9_:/.\x5c-])(?:https?://|//|/)[^\s"\x27<>\\\\()]*~i', static fn( $m ) => $rewrite( $m[0] ), $html );
+		$html = preg_replace_callback( '~(?<![A-Za-z0-9_:/.\x5c-])(?:https?:\\\\/\\\\/|\\\\/\\\\/|\\\\/)[^\s"\x27<>]*~i', static fn( $m ) => str_replace( '/', '\\/', $rewrite( str_replace( '\\/', '/', $m[0] ) ) ), $html );
+		return strtr( $html, $canonicals );
 	}
 
 	public function write_export_file( $path, $contents ) {
+		Operation_Progress::checkpoint();
 		if ( false === @file_put_contents( $path, $contents ) ) {
 			throw new \RuntimeException( 'Não foi possível gravar o arquivo exportado: ' . basename( $path ) );
 		}
@@ -566,6 +584,7 @@ class Static_Engine {
 				continue;
 			}
 			$rel = str_replace( "\\", "/", substr( $path, $base_len ) );
+			if ( ! Gamb_Security_Suite::is_public_asset( $rel ) ) { continue; }
 			if ( "style.css" === strtolower( $rel ) ) {
 				$rel = "main.css";
 			}
@@ -580,7 +599,7 @@ class Static_Engine {
 					$css = $this->minify_css_string( $css );
 				}
 				$this->write_export_file( $dest, $css );
-			} elseif ( "js" === $ext ) {
+			} elseif ( "js" === $ext || "mjs" === $ext ) {
 				$js = (string) @file_get_contents( $path );
 				$js = $guard->sanitize_js_content( $js );
 				$js = $this->apply_url_replacement_mode( $js, "static/ui/" . $rel );
@@ -740,6 +759,7 @@ class Static_Engine {
 		);
 		foreach ( $iterator as $path => $info ) {
 			if ( $info->isFile() && ! $info->isLink() ) {
+				Operation_Progress::checkpoint();
 				$rel  = str_replace( "\\", "/", substr( $path, $base_len ) );
 				$dest = trailingslashit( $dst ) . $rel;
 				@wp_mkdir_p( dirname( $dest ) );
@@ -762,6 +782,7 @@ class Static_Engine {
 			\RecursiveIteratorIterator::CHILD_FIRST
 		);
 		foreach ( $iterator as $info ) {
+			Operation_Progress::checkpoint();
 			if ( $info->isDir() && ! $info->isLink() ) {
 				@rmdir( $info->getPathname() );
 			} else {

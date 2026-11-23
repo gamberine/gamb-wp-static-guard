@@ -82,6 +82,8 @@ class Options {
 			'fallback_404'                     => true,
 			'ensure_home_canonical'            => true,
 			'refresh_local_integrity'          => true,
+			'disable_local_integrity'          => false, // Somente destinos cujo CDN/proxy transforma os bytes.
+			'destination_environment'          => 'production', // production | preview | homologation
 			'require_local_dependencies'       => false,
 			'add_feeds'                        => false,
 			'add_rest_api'                     => false,

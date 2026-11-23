@@ -45,8 +45,8 @@ class Admin_Controller
         if (false === strpos((string) $hook, self::MENU)) {
             return;
         }
-        wp_enqueue_style('gamb-guard-admin', GAMB_STATIC_WP_URL . '/assets/admin-ui.css', array('gamb-guard-menu'), GAMB_STATIC_WP_VERSION);
-        wp_enqueue_script('gamb-guard-admin', GAMB_STATIC_WP_URL . '/assets/admin-ui.js', array(), GAMB_STATIC_WP_VERSION, true);
+        wp_enqueue_style('gamb-guard-admin', GAMB_STATIC_WP_URL . '/assets/admin-ui.css', array('gamb-guard-menu'), $this->asset_version('admin-ui.css'));
+        wp_enqueue_script('gamb-guard-admin', GAMB_STATIC_WP_URL . '/assets/admin-ui.js', array(), $this->asset_version('admin-ui.js'), true);
         wp_localize_script('gamb-guard-admin', 'gambGuardData', array('restUrl' => rest_url(self::API . '/'), 'nonce' => wp_create_nonce('wp_rest')));
     }
     public function register_admin_bar_node($bar)
@@ -54,6 +54,11 @@ class Admin_Controller
         if (is_admin() && current_user_can('manage_options')) {
             $bar->add_node(array('id' => self::MENU, 'title' => 'Gamb Static Guard', 'href' => admin_url('admin.php?page=' . self::MENU)));
         }
+    }
+    private function asset_version($file)
+    {
+        $time = @filemtime(dirname(__DIR__) . '/assets/' . $file);
+        return GAMB_STATIC_WP_VERSION . ($time ? '.' . $time : '');
     }
     public function register_single_push_meta_box()
     {
@@ -73,10 +78,10 @@ class Admin_Controller
             return;
         }
         echo '<p>O botão Atualizar agenda a publicação quando a atualização automática está habilitada. A publicação manual reconstrói o site para sincronizar listagens e pesquisa.</p>';
-        wp_enqueue_script('gamb-guard-single', GAMB_STATIC_WP_URL . '/assets/admin-ui.js', array(), GAMB_STATIC_WP_VERSION, true);
+        wp_enqueue_script('gamb-guard-single', GAMB_STATIC_WP_URL . '/assets/admin-ui.js', array(), $this->asset_version('admin-ui.js'), true);
         wp_localize_script('gamb-guard-single', 'gambGuardData', array('restUrl' => rest_url(self::API . '/'), 'nonce' => wp_create_nonce('wp_rest')));
         echo '<button type="button" class="button" data-gamb-single="' . (int) $post->ID . '">Publicar e atualizar listagens</button><p role="status" aria-live="polite" data-gamb-single-message></p>';
-        wp_enqueue_style('gamb-guard-single', GAMB_STATIC_WP_URL . '/assets/admin-ui.css', array(), GAMB_STATIC_WP_VERSION);
+        wp_enqueue_style('gamb-guard-single', GAMB_STATIC_WP_URL . '/assets/admin-ui.css', array(), $this->asset_version('admin-ui.css'));
     }
     public function register_rest_routes()
     {
@@ -90,6 +95,7 @@ class Admin_Controller
             '/operation-status' => array('methods' => 'GET', 'callback' => static function ($request) {
                 return Operation_Progress::snapshot((string)($request->get_param('id') ?: ''));
             }),
+            '/operation-control' => array('methods' => 'POST', 'callback' => array(Operation_Progress::class, 'control')),
             '/publication-status' => array('methods' => 'GET', 'callback' => static function () {
                 return array_merge(Publication_Status::snapshot(), array('sections' => self::section_badges()));
             }),
@@ -197,6 +203,9 @@ class Admin_Controller
             }
         }
         Operation_Progress::phase('settings', 1, 3, 1, 1, 'Configurações recebidas; validando os campos.');
+        if (isset($params['destination_environment']) && !in_array($params['destination_environment'], array('production', 'preview', 'homologation'), true)) {
+            return new \WP_Error('invalid_environment', 'Selecione produção, preview ou homologação.', array('status' => 400));
+        }
         if (isset($params['github_update_repository']) && (! is_string($params['github_update_repository']) || ! Gamb_GitHub_Updater::valid_repository($params['github_update_repository']))) {
             return new \WP_Error('invalid_repository', 'Informe owner/repo para o GitHub.', array('status' => 400));
         }
@@ -377,7 +386,7 @@ class Admin_Controller
             <div id="gamb-toast" class="gamb-process" role="status" aria-live="polite" aria-atomic="true" hidden>
                 <div class="gamb-process-heading"><strong data-process-label></strong><span data-process-percent></span></div>
                 <div class="gamb-progress-track" role="progressbar" aria-label="Progresso das etapas" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span data-process-bar></span></div>
-                <p data-process-message></p><small data-process-units></small>
+                <div class="gamb-process-detail"><div class="gamb-process-summary"><p data-process-message></p><small data-process-units></small></div><div class="gamb-process-actions" hidden><button type="button" class="button gamb-process-stop" data-process-stop disabled>Parar</button><button type="button" class="button button-primary" data-process-resume hidden>Continuar</button></div></div>
             </div>
             <div class="gamb-layout">
                 <aside class="gamb-sidebar" aria-label="Publicação e segurança">
@@ -451,7 +460,18 @@ class Admin_Controller
                             <option value="offline" <?php selected($options['destination_url_type'], 'offline'); ?>>Relativo ao arquivo</option>
                         </select>
                         <?php $this->input('relative_path', 'Caminho público da publicação, vazio para a raiz do domínio', $options);
-                        $this->input('destination_host', 'Domínio de destino, quando absoluto', $options); ?>
+                        $this->input('destination_host', 'Domínio público do destino (pode incluir caminho)', $options); ?>
+                        <label class="gamb-field" for="gamb-destination-scheme">Protocolo público do destino</label><select id="gamb-destination-scheme" data-opt="destination_scheme">
+                            <option value="https://" <?php selected($options['destination_scheme'], 'https://'); ?>>HTTPS</option>
+                            <option value="http://" <?php selected($options['destination_scheme'], 'http://'); ?>>HTTP</option>
+                        </select>
+                        <label class="gamb-field" for="gamb-environment">Ambiente do destino</label><select id="gamb-environment" data-opt="destination_environment">
+                            <option value="production" <?php selected($options['destination_environment'], 'production'); ?>>Produção — preservar indexação</option>
+                            <option value="preview" <?php selected($options['destination_environment'], 'preview'); ?>>Preview — noindex, nofollow</option>
+                            <option value="homologation" <?php selected($options['destination_environment'], 'homologation'); ?>>Homologação — noindex, nofollow</option>
+                        </select>
+                        <?php $this->checkbox('disable_local_integrity', 'Desabilitar SRI local neste destino (somente quando CDN/proxy transforma os arquivos)', $options); ?>
+                        <p>A canonical usa o domínio e protocolo públicos acima e o caminho da publicação. Sem domínio informado, usa o domínio da origem. Preview/homologação exige que o host aplique as regras de headers geradas. SRI local permanece ativo por padrão; desabilitá-lo não altera a integridade de recursos externos.</p>
                         <fieldset>
                             <legend>Tipos de conteúdo</legend><?php foreach (get_post_types(array('public' => true), 'objects') as $post_type) : if ('attachment' === $post_type->name) {
                                                                         continue;

@@ -72,5 +72,5 @@ try {
     $integrity_html = \GambWPStaticGuard\Installation_Checks::refresh_integrity( $integrity_html, $fixture );
     expect( strpos( $integrity_html, 'sha384-' . base64_encode( hash( 'sha384', 'body{color:#123456}', true ) ) ) !== false, 'Calcular SRI sobre os bytes finais.' );
     expect( strpos( $integrity_html, 'integrity="external"' ) !== false && strpos( $integrity_html, 'integrity="external-relative"' ) !== false, 'Não substituir SRI de recursos de outra origem.' );
-    expect( strpos( $integrity_html, 'crossorigin="anonymous"' ) !== false, 'Completar crossorigin de recurso local com SRI.' );
+    expect( strpos( $integrity_html, 'crossorigin="anonymous"' ) === false, 'Não acrescentar crossorigin apenas por SRI em stylesheet same-origin.' );
 } finally { unlink( $fixture . '/v/fixture_asset' ); rmdir( $fixture . '/v' ); rmdir( $fixture ); }

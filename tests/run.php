@@ -128,5 +128,6 @@ expect( \GambWPStaticGuard\Options::get_default_options()['fallback_404'] && \Ga
 if ( getenv( 'GAMB_WP_HTML_API' ) ) { require __DIR__ . '/html-api.php'; }
 require __DIR__ . '/security.php';
 require __DIR__ . '/workflow.php';
+require __DIR__ . '/export-policy.php';
 require __DIR__ . '/admin.php';
 echo $checks . " verificações independentes concluídas.\n";

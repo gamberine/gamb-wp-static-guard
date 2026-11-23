@@ -78,6 +78,31 @@ class Installation_Checks {
         return strtolower( $parts['host'] ) !== strtolower( $home['host'] ) || ( $parts['port'] ?? ( 'https' === $parts['scheme'] ? 443 : 80 ) ) !== ( $home['port'] ?? ( 'https' === $home['scheme'] ? 443 : 80 ) );
     }
 
+    public static function preview_destination() {
+        return in_array( Options::instance()->get( 'destination_environment', 'production' ), array( 'preview', 'homologation' ), true );
+    }
+
+    /** Executado depois da reescrita: metadata absoluta não depende do modo dos links. */
+    public static function finalize_document( $html, $rel_file ) {
+        if ( ! preg_match( '~</head\s*>~i', $html ) ) { throw new \RuntimeException( 'A página exportada não possui cabeçalho HTML para canonical e robots.' ); }
+        $error = '404.html' === $rel_file;
+        if ( $error ) { $html = self::complete_document( $html, false, true ); }
+        if ( ! $error ) {
+            $html = preg_replace_callback( '~<link\b(?:[^>"\x27]|"[^"]*"|\x27[^\x27]*\x27)*>~i', static fn( $m ) => self::canonical_tag( $m[0] ) ? '' : $m[0], $html );
+            $path = preg_replace( '~(?:^|/)index\.html$~', '/', str_replace( '\\', '/', $rel_file ) );
+            $canonical = Static_Engine::get_instance()->public_base_url() . ltrim( $path, '/' );
+            $html = preg_replace( '~</head\s*>~i', '<link rel="canonical" href="' . esc_url( $canonical ) . '" />' . "\n</head>", $html, 1 );
+        }
+        if ( self::preview_destination() ) {
+            $html = preg_replace_callback( '~<meta\b(?:[^>"\x27]|"[^"]*"|\x27[^\x27]*\x27)*>~i', static function( $m ) {
+                $tag = new \WP_HTML_Tag_Processor( $m[0] );
+                return $tag->next_tag( 'META' ) && 'robots' === strtolower( (string) $tag->get_attribute( 'name' ) ) ? '' : $m[0];
+            }, $html );
+            $html = preg_replace( '~</head\s*>~i', '<meta name="robots" content="noindex, nofollow" />' . "\n</head>", $html, 1 );
+        }
+        return $html;
+    }
+
     /** Não persiste parâmetros, fragmentos nem credenciais de endereços de terceiros. */
     public static function public_reference( $url ) {
         $parts = wp_parse_url( $url );
@@ -171,33 +196,55 @@ class Installation_Checks {
     }
 
     /** O hash considera os bytes finais, depois da reescrita de URLs e dos comentários. */
-    public static function refresh_integrity( $html, $archive_dir ) {
+    public static function refresh_integrity( $html, $archive_dir, $rel_file = 'index.html' ) {
         $processor = new \WP_HTML_Tag_Processor( $html );
         while ( $processor->next_tag() ) {
             $tag = $processor->get_tag();
             if ( 'SCRIPT' !== $tag && ! ( 'LINK' === $tag && in_array( 'stylesheet', preg_split( '/\s+/', strtolower( (string) $processor->get_attribute( 'rel' ) ) ), true ) ) ) { continue; }
             $url = $processor->get_attribute( 'SCRIPT' === $tag ? 'src' : 'href' );
             if ( ! is_string( $url ) ) { continue; }
-            $path = wp_parse_url( $url, PHP_URL_PATH );
-            if ( ! is_string( $path ) || ! preg_match( '~(?:^|/)v/([A-Za-z0-9_-]+(?:\.(?:css|js|mjs))?)$~D', $path, $match ) ) { continue; }
-            // Apenas arquivos já materializados pelo plugin, nunca o destino indicado por uma URL remota.
-            $expected_url = Static_Engine::get_instance()->apply_url_replacement_mode( home_url( '/v/' . $match[1] ), 'index.html' );
-            if ( wp_parse_url( $url, PHP_URL_HOST ) && $url !== $expected_url ) { continue; }
-            $file = trailingslashit( $archive_dir ) . 'v/' . $match[1];
-            if ( ! is_file( $file ) || is_link( $file ) ) { continue; }
-            $processor->set_attribute( 'integrity', 'sha384-' . base64_encode( hash_file( 'sha384', $file, true ) ) );
-            $processor->set_attribute( 'crossorigin', 'anonymous' );
+            if ( '' === $url || preg_match( '~^(?:data:|blob:|#)~i', $url ) ) { continue; }
+            $base = Static_Engine::get_instance()->public_base_url();
+            $absolute = \WP_Http::make_absolute_url( $url, $base . $rel_file );
+            if ( ! Static_Engine::same_origin( $absolute, $base ) ) { continue; }
+            $path = rawurldecode( (string) wp_parse_url( $absolute, PHP_URL_PATH ) );
+            $prefix = (string) wp_parse_url( $base, PHP_URL_PATH );
+            if ( ! str_starts_with( $path, $prefix ) ) { continue; }
+            $relative = substr( $path, strlen( $prefix ) );
+            $root = realpath( $archive_dir ); $candidate = trailingslashit( $archive_dir ) . $relative;
+            $file = realpath( $candidate );
+            if ( ! $root || ! $file || ! is_file( $file ) || is_link( $candidate ) || ! str_starts_with( wp_normalize_path( $file ), trailingslashit( wp_normalize_path( $root ) ) ) ) {
+                throw new \RuntimeException( 'Recurso local de SRI ausente ou fora da exportação: ' . basename( $relative ) );
+            }
+            $old = $processor->get_attribute( 'integrity' );
+            $disable = Options::instance()->get( 'disable_local_integrity', false );
+            if ( $disable ) { $processor->remove_attribute( 'integrity' ); }
+            elseif ( Options::instance()->get( 'refresh_local_integrity', true ) ) {
+                $processor->set_attribute( 'integrity', 'sha384-' . base64_encode( hash_file( 'sha384', $file, true ) ) );
+            } elseif ( is_string( $old ) ) {
+                // Sem recálculo, preservar somente hashes que ainda descrevem os bytes finais.
+                $valid = false;
+                foreach ( preg_split( '/\s+/', trim( $old ) ) as $hash ) {
+                    if ( preg_match( '/^(sha256|sha384|sha512)-([A-Za-z0-9+\/=]+)$/D', $hash, $m ) && hash_equals( $m[2], base64_encode( hash_file( $m[1], $file, true ) ) ) ) { $valid = true; }
+                    else { $valid = false; break; }
+                }
+                if ( ! $valid ) { $processor->remove_attribute( 'integrity' ); }
+            }
+            $rel = preg_split( '/\s+/', strtolower( (string) $processor->get_attribute( 'rel' ) ) );
+            if ( 'LINK' === $tag && ! in_array( 'preload', $rel, true ) && is_string( $old ) && in_array( strtolower( (string) $processor->get_attribute( 'crossorigin' ) ), array( '', 'anonymous' ), true ) ) {
+                $processor->remove_attribute( 'crossorigin' );
+            }
         }
         return $processor->get_updated_html();
     }
 
     public static function finalize_integrity( $archive_dir ) {
-        if ( ! Options::instance()->get( 'refresh_local_integrity', true ) ) { return; }
         $iterator = new \RecursiveIteratorIterator( new \RecursiveDirectoryIterator( $archive_dir, \FilesystemIterator::SKIP_DOTS ) );
         foreach ( $iterator as $file ) {
             if ( $file->isLink() || ! $file->isFile() || 'html' !== strtolower( $file->getExtension() ) ) { continue; }
             $before = (string) file_get_contents( $file->getPathname() );
-            $after = self::refresh_integrity( $before, $archive_dir );
+            $relative = str_replace( '\\', '/', substr( $file->getPathname(), strlen( trailingslashit( $archive_dir ) ) ) );
+            $after = self::refresh_integrity( $before, $archive_dir, $relative );
             if ( $after !== $before ) { Static_Engine::get_instance()->write_export_file( $file->getPathname(), $after ); }
         }
     }

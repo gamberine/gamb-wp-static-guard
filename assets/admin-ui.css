@@ -510,6 +510,52 @@
     line-height: 1.6;
 }
 
+.gamb-process-detail {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+}
+
+.gamb-process-summary {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px 12px;
+    min-width: 0;
+}
+
+.gamb-process [data-process-message] { margin: 0; }
+.gamb-process [data-process-units] {
+    display: inline;
+    padding-left: 12px;
+    border-left: 2px solid #c9d1e2;
+    color: #52677f;
+}
+.gamb-process-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-left: auto;
+    flex: 0 0 auto;
+}
+.gamb-process-actions[hidden], .gamb-process-actions button[hidden] { display: none; }
+.gamb-process .gamb-process-stop {
+    background: #b32d2e;
+    border-color: #b32d2e;
+    color: #fff;
+}
+.gamb-process .gamb-process-stop:hover:not(:disabled) { background: #8a2424; border-color: #8a2424; color: #fff; }
+.gamb-process .gamb-process-stop:disabled { opacity: .6; }
+#gamb-toast[data-state=paused],
+.gamb-process[data-state=paused] { --process-color: #996800; background: #fffaf0; border-color: #d8c291; border-left-color: var(--process-color); }
+.gamb-process[data-state=paused] .gamb-progress-track>span { animation: none; }
+@media (max-width: 600px) {
+    .gamb-process-detail { align-items: flex-start; flex-wrap: wrap; gap: 10px; }
+    .gamb-process-summary { flex-basis: 100%; }
+    .gamb-process [data-process-units] { padding-left: 8px; }
+}
+
 #gamb-toast[data-state=success],
 .gamb-process[data-state=success] {
     --process-color  : #187441;
