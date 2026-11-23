@@ -344,12 +344,12 @@ class Admin_Controller
             $audit_warning = $audit_warning || in_array($severity, array('WARNING', 'MEDIUM', 'LOW'), true);
         }
         if ($audit_error) {
-            $guard = $badge('error', 'Impedimento', 'error', 'A auditoria registrou impedimentos. Consulte Atualizações e auditoria.');
+            $guard = $badge('error', 'Impedimento', 'error', 'A auditoria registrou impedimentos. Consulte Auditoria da publicação.');
         } elseif ('error' !== $guard['tone']) {
             if (get_option(Gamb_Static_Auditor::PENDING_OPTION, false) || (!empty($audit['checked_at']) && ($audit['version'] ?? '') !== GAMB_STATIC_WP_VERSION)) {
                 $guard = $badge('stale', 'Revalidar', 'warning', 'Há uma revalidação de segurança pendente. Execute a auditoria.');
             } elseif ($audit_warning) {
-                $guard = $badge('warning', 'Atenção', 'warning', 'A auditoria registrou alertas. Consulte Atualizações e auditoria.');
+                $guard = $badge('warning', 'Atenção', 'warning', 'A auditoria registrou alertas. Consulte Auditoria da publicação.');
             } elseif ('success' === $guard['tone']) {
                 if (empty($audit['checked_at']) || true !== ($audit['success'] ?? null) || (int) ($audit['documents'] ?? 0) < 1) {
                     $guard = $badge('unknown', 'Não auditado', 'neutral', 'Execute a auditoria sobre os documentos da publicação estática.');
@@ -392,11 +392,27 @@ class Admin_Controller
                 <aside class="gamb-sidebar" aria-label="Publicação e segurança">
                     <details class="gamb-sidebox" name="gamb-sections" open>
                         <summary><span>1. STATIC/Conversão</span><span class="gamb-badge" data-section-badge="static" role="status" aria-live="polite" title="<?php echo esc_attr($sections['static']['message']); ?>" data-tone="<?php echo esc_attr($sections['static']['tone']); ?>"><?php echo esc_html($sections['static']['label']); ?></span></summary>
-                        <nav class="gamb-admin-nav" aria-label="Conversão estática"><button type="button" class="button" data-tab="publication" aria-controls="panel-publication" aria-pressed="true">Publicação e registro</button><button type="button" class="button" data-tab="diagnostics" aria-controls="panel-diagnostics" aria-pressed="false">Diagnóstico da instalação</button><button type="button" class="button" data-tab="settings" aria-controls="panel-settings" aria-pressed="false">Configuração da conversão</button></nav>
+                        <nav class="gamb-admin-nav" aria-label="Conversão estática">
+                            <button type="button" class="button" data-tab="publication" aria-controls="panel-publication" aria-pressed="true">Visão geral da publicação</button>
+                            <button type="button" class="button" data-tab="activity" aria-controls="panel-activity" aria-pressed="false">Registro de atividades</button>
+                            <button type="button" class="button" data-tab="settings" aria-controls="panel-settings" aria-pressed="false">Destino e endereços</button>
+                            <button type="button" class="button" data-tab="conversion" aria-controls="panel-conversion" aria-pressed="false">Conteúdo e conversão</button>
+                            <button type="button" class="button" data-tab="automation" aria-controls="panel-automation" aria-pressed="false">Automação e notificações</button>
+                            <button type="button" class="button" data-tab="performance" aria-controls="panel-performance" aria-pressed="false">Integridade e desempenho</button>
+                            <button type="button" class="button" data-tab="diagnostics" aria-controls="panel-diagnostics" aria-pressed="false">Diagnóstico da instalação</button>
+                            <button type="button" class="button" data-tab="dependencies" aria-controls="panel-dependencies" aria-pressed="false">Dependências externas</button>
+                        </nav>
                     </details>
                     <details class="gamb-sidebox" name="gamb-sections">
                         <summary><span>2. Guard/Segurança</span><span class="gamb-badge" data-section-badge="guard" role="status" aria-live="polite" title="<?php echo esc_attr($sections['guard']['message']); ?>" data-tone="<?php echo esc_attr($sections['guard']['tone']); ?>"><?php echo esc_html($sections['guard']['label']); ?></span></summary>
-                        <nav class="gamb-admin-nav" aria-label="Controles de segurança"><button type="button" class="button" data-tab="guard" aria-controls="panel-guard" aria-pressed="false">Controles de exposição</button><button type="button" class="button" data-tab="updates" aria-controls="panel-updates" aria-pressed="false">Atualizações e auditoria</button><button type="button" class="button" data-tab="monitor" aria-controls="panel-monitor" aria-pressed="false">Monitor da versão WP</button><button type="button" class="button" data-tab="backup" aria-controls="panel-backup" aria-pressed="false">Gerenciador de backups</button></nav>
+                        <nav class="gamb-admin-nav" aria-label="Controles de segurança">
+                            <button type="button" class="button" data-tab="guard" aria-controls="panel-guard" aria-pressed="false">Controles de exposição</button>
+                            <button type="button" class="button" data-tab="updates" aria-controls="panel-updates" aria-pressed="false">Atualizações do plugin</button>
+                            <button type="button" class="button" data-tab="audit" aria-controls="panel-audit" aria-pressed="false">Auditoria da publicação</button>
+                            <button type="button" class="button" data-tab="monitor" aria-controls="panel-monitor" aria-pressed="false">Monitor da versão WP</button>
+                            <button type="button" class="button" data-tab="monitor-query" aria-controls="panel-monitor-query" aria-pressed="false">Consultas do monitor</button>
+                            <button type="button" class="button" data-tab="backup" aria-controls="panel-backup" aria-pressed="false">Gerenciador de backups</button>
+                        </nav>
                     </details>
                     <details class="gamb-sidebox gamb-scope-box" name="gamb-sections">
                         <summary id="gamb-scope-heading"><span>3. Escopo da Conversão</span><span class="gamb-badge" data-publication-badge data-tone="<?php echo esc_attr($publication['tone']); ?>"><?php echo esc_html($publication['label']); ?></span></summary>
@@ -433,6 +449,8 @@ class Admin_Controller
                             </div>
                         </dl>
                         <div id="gamb-latest-zip-wrap"></div>
+                    </section>
+                    <section class="gamb-panel" id="panel-activity" hidden>
                         <h2>Registro de atividades</h2>
                         <div id="gamb-activity-log-box"><?php foreach ((array) $options['archive_status_messages'] as $entry) : ?><p><?php echo esc_html(($entry['datetime'] ?? '') . ' - ' . ($entry['message'] ?? '')); ?></p><?php endforeach; ?></div>
                     </section>
@@ -442,47 +460,77 @@ class Admin_Controller
                         <p>Verificação da origem: <span data-diagnostics-time><?php echo esc_html($diagnostics['checked_at'] ?? 'Não realizada'); ?></span></p>
                         <button type="button" class="button" data-run-diagnostics>Verificar novamente</button>
                         <ul data-installation-checks><?php foreach ((array) ($diagnostics['checks'] ?? array()) as $check) : ?><li><strong><?php echo esc_html(array('ok' => 'Verificado', 'warning' => 'Atenção', 'error' => 'Impedimento')[$check['status']] ?? 'Informação'); ?>:</strong> <?php echo esc_html($check['message']); ?></li><?php endforeach; ?></ul>
+                    </section>
+                    <section class="gamb-panel" id="panel-dependencies" hidden>
                         <h3>Dependências externas</h3>
                         <p>Recursos de renderização e serviços externos exigem avaliação de versão, compatibilidade e licença antes da internalização. Links de navegação não são copiados. Nenhum arquivo do tema é alterado por este diagnóstico.</p>
                         <p data-dependency-summary><?php echo esc_html(count($resources['dependencies'] ?? array()) . ' dependência(s); ' . ($resources['external_navigation_count'] ?? 0) . ' link(s) externo(s) de navegação. ' . (! empty($resources['limited']) ? 'Limite de inspeção atingido. ' : '') . ($resources['scope'] ?? '')); ?></p>
                         <ul data-dependency-list><?php foreach ((array) ($resources['dependencies'] ?? array()) as $dependency) : ?><li><?php echo esc_html($dependency['kind'] . ': ' . $dependency['url']); ?></li><?php endforeach; ?></ul>
                     </section>
                     <section class="gamb-panel" id="panel-settings" hidden>
-                        <h2>Configuração da publicação</h2>
+                        <h2>Destino e endereços</h2>
+                        <div class="gamb-form-grid">
+                        <div>
                         <label class="gamb-field" for="gamb-delivery">Forma de entrega</label><select id="gamb-delivery" data-opt="delivery_method">
                             <option value="local" <?php selected($options['delivery_method'], 'local'); ?>>Diretório local</option>
                             <option value="zip" <?php selected($options['delivery_method'], 'zip'); ?>>Arquivo ZIP</option>
                         </select>
-                        <?php $this->input('local_dir', 'Diretório local dedicado à publicação', $options); ?>
+                        </div>
+                        <div><?php $this->input('local_dir', 'Diretório local dedicado à publicação', $options); ?></div>
+                        <div>
                         <label class="gamb-field" for="gamb-url-type">Formato dos endereços</label><select id="gamb-url-type" data-opt="destination_url_type">
                             <option value="relative" <?php selected($options['destination_url_type'], 'relative'); ?>>Relativo ao domínio</option>
                             <option value="absolute" <?php selected($options['destination_url_type'], 'absolute'); ?>>Absoluto</option>
                             <option value="offline" <?php selected($options['destination_url_type'], 'offline'); ?>>Relativo ao arquivo</option>
                         </select>
-                        <?php $this->input('relative_path', 'Caminho público da publicação, vazio para a raiz do domínio', $options);
-                        $this->input('destination_host', 'Domínio público do destino (pode incluir caminho)', $options); ?>
+                        </div>
+                        <div><?php $this->input('relative_path', 'Caminho público da publicação, vazio para a raiz do domínio', $options); ?></div>
+                        <div><?php $this->input('destination_host', 'Domínio público do destino (pode incluir caminho)', $options); ?></div>
+                        <div>
                         <label class="gamb-field" for="gamb-destination-scheme">Protocolo público do destino</label><select id="gamb-destination-scheme" data-opt="destination_scheme">
                             <option value="https://" <?php selected($options['destination_scheme'], 'https://'); ?>>HTTPS</option>
                             <option value="http://" <?php selected($options['destination_scheme'], 'http://'); ?>>HTTP</option>
                         </select>
+                        </div>
+                        <div>
                         <label class="gamb-field" for="gamb-environment">Ambiente do destino</label><select id="gamb-environment" data-opt="destination_environment">
                             <option value="production" <?php selected($options['destination_environment'], 'production'); ?>>Produção — preservar indexação</option>
                             <option value="preview" <?php selected($options['destination_environment'], 'preview'); ?>>Preview — noindex, nofollow</option>
                             <option value="homologation" <?php selected($options['destination_environment'], 'homologation'); ?>>Homologação — noindex, nofollow</option>
                         </select>
-                        <?php $this->checkbox('disable_local_integrity', 'Desabilitar SRI local neste destino (somente quando CDN/proxy transforma os arquivos)', $options); ?>
-                        <p>A canonical usa o domínio e protocolo públicos acima e o caminho da publicação. Sem domínio informado, usa o domínio da origem. Preview/homologação exige que o host aplique as regras de headers geradas. SRI local permanece ativo por padrão; desabilitá-lo não altera a integridade de recursos externos.</p>
+                        </div>
+                        </div>
+                        <p class="gamb-help">A canonical usa o domínio, protocolo e caminho públicos. Sem domínio informado, usa a origem. Preview/homologação exige que o host aplique os headers gerados.</p>
+                        <button type="button" class="button button-primary gamb-save-settings-btn">Salvar configurações</button>
+                    </section>
+                    <section class="gamb-panel" id="panel-conversion" hidden>
+                        <h2>Conteúdo e conversão</h2>
                         <fieldset>
                             <legend>Tipos de conteúdo</legend><?php foreach (get_post_types(array('public' => true), 'objects') as $post_type) : if ('attachment' === $post_type->name) {
                                                                         continue;
                                                                     } ?><label class="gamb-setting"><input class="gamb-pt-checkbox" type="checkbox" value="<?php echo esc_attr($post_type->name); ?>" <?php checked((empty($options['post_types']) || in_array($post_type->name, (array) $options['post_types'], true))); ?>> <?php echo esc_html($post_type->label); ?></label><?php endforeach; ?>
                         </fieldset>
-                        <?php foreach (array('single_enabled' => 'Habilitar publicação a partir do editor', 'auto_export' => 'Agendar publicação ao salvar conteúdo publicado', 'use_search' => 'Gerar índice de pesquisa local', 'fallback_404' => 'Usar página de erro de apoio em temas clássicos sem modelo 404', 'ensure_home_canonical' => 'Acrescentar canonical à Home exportada quando ausente', 'refresh_local_integrity' => 'Calcular SRI sobre os estilos e scripts reescritos pelo plugin', 'require_local_dependencies' => 'Interromper publicação com dependências externas identificadas ou inspeção incompleta', 'use_minify' => 'Aplicar minificação adicional', 'clear_directory_before_export' => 'Remover arquivos gerados obsoletos após publicação completa') as $key => $label) {
+                        <?php foreach (array('use_search' => 'Gerar índice de pesquisa local', 'fallback_404' => 'Usar página de erro de apoio em temas clássicos sem modelo 404', 'ensure_home_canonical' => 'Acrescentar canonical à Home exportada quando ausente', 'require_local_dependencies' => 'Interromper publicação com dependências externas identificadas ou inspeção incompleta', 'clear_directory_before_export' => 'Remover arquivos gerados obsoletos após publicação completa') as $key => $label) {
                             $this->checkbox($key, $label, $options);
                         } ?>
+                        <p class="gamb-help">A pesquisa local requer um campo de pesquisa no tema e JavaScript no navegador.</p>
+                        <button type="button" class="button button-primary gamb-save-settings-btn">Salvar configurações</button>
+                    </section>
+                    <section class="gamb-panel" id="panel-automation" hidden>
+                        <h2>Automação e notificações</h2>
+                        <?php $this->checkbox('single_enabled', 'Habilitar publicação a partir do editor', $options);
+                        $this->checkbox('auto_export', 'Agendar publicação ao salvar conteúdo publicado', $options); ?>
                         <?php $this->input('auto_export_delay', 'Espera mínima para agendamento, em segundos', $options, 'number');
                         $this->input('webhook_url', 'Endereço opcional para notificar a publicação concluída', $options, 'url'); ?>
-                        <p>A atualização automática depende da execução do agendador do WordPress. Pesquisa local requer um campo de pesquisa no tema e JavaScript habilitado no navegador.</p>
+                        <p class="gamb-help">A atualização automática depende da execução do agendador do WordPress.</p>
+                        <button type="button" class="button button-primary gamb-save-settings-btn">Salvar configurações</button>
+                    </section>
+                    <section class="gamb-panel" id="panel-performance" hidden>
+                        <h2>Integridade e desempenho</h2>
+                        <?php $this->checkbox('refresh_local_integrity', 'Calcular SRI sobre os estilos e scripts reescritos pelo plugin', $options);
+                        $this->checkbox('disable_local_integrity', 'Desabilitar SRI local neste destino (somente quando CDN/proxy transforma os arquivos)', $options);
+                        $this->checkbox('use_minify', 'Aplicar minificação adicional', $options); ?>
+                        <p class="gamb-help">SRI local permanece ativo por padrão. A desativação local não altera a integridade de recursos externos.</p>
                         <button type="button" class="button button-primary gamb-save-settings-btn">Salvar configurações</button>
                     </section>
                     <section class="gamb-panel" id="panel-guard" hidden>
@@ -497,10 +545,14 @@ class Admin_Controller
                         <h2 id="gamb-monitor-heading">Monitor da versão WordPress</h2>
                         <p>Disponibiliza a versão em JSON somente para IPs exatos autorizados. Uma lista vazia bloqueia todas as origens. O acesso administrativo não dispensa essa restrição.</p>
                         <?php $this->checkbox('version_monitor_enabled', 'Habilitar o monitor da versão WordPress', $options); ?>
-                        <label class="gamb-field" for="gamb-monitor-ips">IPs autorizados — um IPv4 ou IPv6 por linha</label><textarea class="large-text code" rows="6" id="gamb-monitor-ips" data-opt="version_monitor_allowed_ips"><?php echo esc_textarea(implode("\n", (array)$options['version_monitor_allowed_ips'])); ?></textarea>
-                        <label class="gamb-field" for="gamb-monitor-proxies">Proxies explicitamente confiáveis — um IP por linha</label><textarea class="large-text code" rows="4" id="gamb-monitor-proxies" data-opt="version_monitor_trusted_proxies"><?php echo esc_textarea(implode("\n", (array)$options['version_monitor_trusted_proxies'])); ?></textarea>
+                        <div class="gamb-form-grid">
+                        <div><label class="gamb-field" for="gamb-monitor-ips">IPs autorizados — um IPv4 ou IPv6 por linha</label><textarea class="large-text code" rows="5" id="gamb-monitor-ips" data-opt="version_monitor_allowed_ips"><?php echo esc_textarea(implode("\n", (array)$options['version_monitor_allowed_ips'])); ?></textarea></div>
+                        <div><label class="gamb-field" for="gamb-monitor-proxies">Proxies explicitamente confiáveis — um IP por linha</label><textarea class="large-text code" rows="5" id="gamb-monitor-proxies" data-opt="version_monitor_trusted_proxies"><?php echo esc_textarea(implode("\n", (array)$options['version_monitor_trusted_proxies'])); ?></textarea></div>
+                        </div>
                         <p>Deixe proxies vazios em conexões diretas. X-Forwarded-For só é considerado quando a conexão vem de um proxy informado. Não são aceitos CIDR, curingas, nomes de host ou autorização automática de loopback.</p>
                         <button type="button" class="button button-primary gamb-save-settings-btn">Salvar configurações</button>
+                    </section>
+                    <section class="gamb-panel" id="panel-monitor-query" hidden>
                         <h3>Endereços de consulta</h3>
                         <p><a data-monitor-url href="<?php echo esc_url(rest_url('gamb-wp-static-guard/v1/wordpress-version')); ?>" target="_blank" rel="noopener noreferrer"><?php echo esc_html(rest_url('gamb-wp-static-guard/v1/wordpress-version')); ?></a></p>
                         <p class="gamb-wrap-anywhere">Compatibilidade: <code><?php echo esc_html(rest_url('monitor-versao-wp')); ?></code> e <code><?php echo esc_html(rest_url('monitor-versao-wp/check')); ?></code>. A rota antiga <code>/meu-sistema/v1/versao</code> permanece removida.</p>
@@ -514,7 +566,7 @@ class Admin_Controller
                         <div class="gamb-backup-list" data-backup-list role="region" aria-label="Cópias de segurança" tabindex="0"></div>
                     </section>
                     <section class="gamb-panel" id="panel-updates" hidden aria-labelledby="gamb-updates-heading">
-                        <h2 id="gamb-updates-heading">Atualizações e auditoria</h2>
+                        <h2 id="gamb-updates-heading">Atualizações do plugin</h2>
                         <p>As versões são consultadas no GitHub Releases. A instalação e a ativação das atualizações automáticas utilizam os controles nativos do WordPress.</p>
                         <p data-update-status role="status" aria-live="polite">Versão instalada: <?php echo esc_html(GAMB_STATIC_WP_VERSION); ?>.</p>
                         <button type="button" class="button" data-check-updates>Verificar atualizações agora</button>
@@ -524,10 +576,13 @@ class Admin_Controller
                         <input class="regular-text" type="password" id="gamb-github-token" data-opt="github_update_token" value="" autocomplete="new-password" <?php disabled(defined('GAMB_GITHUB_TOKEN')); ?>>
                         <p>O campo vazio preserva o token atual. O valor salvo é criptografado; a constante GAMB_GITHUB_TOKEN tem precedência e não é exibida.</p>
                         <label class="gamb-setting"><input type="checkbox" data-opt="github_clear_token" <?php disabled(defined('GAMB_GITHUB_TOKEN')); ?>> Remover token salvo</label>
+                        <button type="button" class="button button-primary gamb-save-settings-btn">Salvar configurações</button>
+                    </section>
+                    <section class="gamb-panel" id="panel-audit" hidden>
+                        <h2>Auditoria da publicação</h2>
                         <?php $this->input('sanitizer_style_whitelist', 'IDs de estilos nativos preservados, separados por espaços', $options);
                         $this->input('audit_unresolved_shortcodes', 'Shortcodes não resolvidos que devem bloquear a publicação, sem colchetes', $options); ?>
                         <button type="button" class="button button-primary gamb-save-settings-btn">Salvar configurações</button>
-                        <h3>Auditoria de publicação</h3>
                         <p>O gate examina o buffer original e o HTML final. Um impedimento CRITICAL interrompe a entrega e preserva a publicação existente.</p>
                         <button type="button" class="button" data-run-audit>Revalidar origem agora</button>
                         <p data-audit-status role="status" aria-live="polite">Consulte o relatório para verificar a última execução.</p>

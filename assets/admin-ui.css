@@ -28,6 +28,71 @@
     min-width: 0;
 }
 
+/* A área de trabalho acompanha a altura real do toast e da barra do WordPress. */
+.gamb-workspace-ready .gamb-workspace-slot {
+    height: max(180px, calc(100dvh - var(--gamb-workspace-top, 170px) - 16px));
+    margin-top: 16px;
+}
+.gamb-workspace-ready .gamb-layout {
+    position: relative;
+    height: 100%;
+    min-height: 0;
+    align-items: stretch;
+}
+.gamb-workspace-docked .gamb-layout {
+    position: fixed;
+    top: var(--gamb-workspace-top);
+    left: var(--gamb-workspace-left);
+    width: var(--gamb-workspace-width);
+    height: max(180px, calc(100dvh - var(--gamb-workspace-top) - 16px));
+    z-index: 40;
+}
+.gamb-workspace-ready .gamb-sidebar {
+    position: static;
+    height: 100%;
+    min-height: 0;
+    margin: 0;
+    overflow: auto;
+    overscroll-behavior: contain;
+    scrollbar-gutter: stable;
+    scroll-padding: 8px;
+}
+.gamb-workspace-ready .gamb-content { min-height: 0; height: 100%; overflow: hidden; }
+.gamb-workspace-ready .gamb-panel {
+    box-sizing: border-box;
+    height: 100%;
+    min-height: 0;
+    margin: 0;
+    padding: 20px;
+    overflow: auto;
+    overscroll-behavior: contain;
+    scrollbar-gutter: stable;
+    scroll-padding: 16px;
+}
+.gamb-workspace-ready .gamb-panel:focus-visible { outline: 2px solid var(--gamb-accent); outline-offset: -3px; }
+.gamb-workspace-ready .gamb-sidebox { padding: 14px; margin-bottom: 12px; }
+.gamb-workspace-ready .gamb-sidebox>summary { position: sticky; top: 0; z-index: 1; background: #fff; padding: 4px 0; }
+.gamb-workspace-ready .gamb-sidebox:last-child { margin-bottom: 0; }
+.gamb-workspace-ready .gamb-admin-nav { gap: 5px; margin-top: 10px; }
+.gamb-workspace-ready .gamb-admin-nav .gamb-tab { min-height: 36px; padding: 7px 10px; }
+.gamb-workspace-ready .gamb-panel h1,
+.gamb-workspace-ready .gamb-panel h2 { margin-top: 0; margin-bottom: 14px; }
+.gamb-workspace-ready .gamb-field { margin-top: 16px; }
+.gamb-workspace-ready .gamb-setting { gap: 10px; line-height: 1.6; padding: 7px 0; align-items: flex-start; }
+.gamb-workspace-ready .gamb-setting input { margin-top: 3px !important; }
+.gamb-workspace-ready fieldset { gap: 8px 20px; padding: 12px; }
+.gamb-workspace-ready .gamb-save-settings-btn { margin-top: 16px; }
+.gamb-workspace-ready #gamb-activity-log-box,
+.gamb-workspace-ready .gamb-monitor-result { max-height: none; overflow: visible; }
+.gamb-workspace-ready .gamb-monitor-result { overflow-wrap: anywhere; }
+.gamb-form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px 20px; }
+.gamb-form-grid>div { min-width: 0; }
+.gamb-workspace-ready .gamb-form-grid .gamb-field { margin: 0 0 7px; }
+.gamb-form-grid input:not([type=checkbox]),
+.gamb-form-grid select,
+.gamb-form-grid textarea { box-sizing: border-box; width: 100%; max-width: 100%; }
+.gamb-help { color: #52677f; font-size: 12px; }
+
 .gamb-sidebox {
     padding      : 18px;
     margin       : 0 0 16px;
@@ -295,6 +360,10 @@
     .gamb-sidebar {
         position: static;
     }
+    .gamb-workspace-ready .gamb-layout {
+        grid-template-rows: minmax(150px, 28%) minmax(0, 1fr);
+        gap: 12px;
+    }
 }
 
 @media (max-width: 600px) {
@@ -307,6 +376,8 @@
     .gamb-admin select {
         max-width: 100%;
     }
+    .gamb-form-grid { grid-template-columns: 1fr; gap: 14px; }
+    .gamb-workspace-ready .gamb-panel { padding: 16px; }
 }
 
 /* Navegação e estados da versão 5.1.0. O foco nativo do WordPress é preservado. */
@@ -452,7 +523,7 @@
 .gamb-process {
     --process-color: #3346b0;
     position       : sticky;
-    top            : 38px;
+    top            : var(--gamb-toolbar-top, 38px);
     z-index        : 50;
     box-sizing     : border-box;
     padding        : 16px 20px;
@@ -610,8 +681,17 @@
     }
 
     .gamb-process {
-        top: 52px;
+        top: var(--gamb-toolbar-top, 52px);
     }
+}
+
+/* Teclado virtual, modo paisagem ou zoom: manter todos os campos alcançáveis. */
+@media (max-height: 520px) {
+    .gamb-workspace-ready .gamb-workspace-slot { height: auto; }
+    .gamb-workspace-ready .gamb-layout { position: static; height: auto; grid-template-rows: none; }
+    .gamb-workspace-ready .gamb-sidebar,
+    .gamb-workspace-ready .gamb-content,
+    .gamb-workspace-ready .gamb-panel { height: auto; overflow: visible; }
 }
 
 @media (prefers-reduced-motion: reduce) {
