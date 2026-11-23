@@ -1,0 +1,21 @@
+/* Estilos do menu lateral em todas as telas administrativas. */
+.toplevel_page_gamb-wp-static-guard .wp-menu-image.dashicons-before,
+.toplevel_page_gamb-wp-static-guard div.wp-menu-image {
+    display        : flex;
+    align-items    : center;
+    justify-content: center;
+}
+
+.toplevel_page_gamb-wp-static-guard .wp-menu-image.dashicons-before img,
+.toplevel_page_gamb-wp-static-guard .wp-menu-image img {
+    padding: 0 !important;
+    opacity: 1;
+}
+
+li#toplevel_page_gamb-wp-static-guard>a>div.wp-menu-name {
+    padding    : 8px 0 8px 36px;
+    color      : #6678ff;
+    font-weight: 600;
+    line-height: 1.2;
+}
+

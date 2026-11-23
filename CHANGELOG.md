@@ -2,6 +2,15 @@
 
 Este documento distingue a incorporação histórica das novas alterações. As datas correspondem ao registro verificável, sem reconstruir datas de commits inexistentes.
 
+## 5.2.0 - 2026-11-23
+
+- Substituir os rótulos fixos de STATIC e GUARD por estados derivados do diagnóstico e da auditoria, com tratamento de impedimentos, alertas, ausência de verificação e revalidação pendente.
+- Atualizar as badges no HTML inicial e na consulta de estado após operações, sem alterar as permissões administrativas ou executar diagnósticos durante a leitura.
+- Carregar somente os estilos do menu lateral em todas as telas administrativas e manter os estilos e scripts do painel restritos ao seu contexto.
+- Padronizar os controles Baixar e Excluir dos backups, com espaçamento de 8 px, alinhamento e quebra de linha, preservando a confirmação de exclusão.
+- Incorporar os ajustes locais do painel e tornar o cabeçalho responsivo com CSS próprio, sem depender de classes Bootstrap ausentes.
+- Restringir as regras do menu ao próprio plugin e eliminar sua duplicação na folha do painel.
+
 ## 5.1.1 - 2026-11-19
 
 - Corrigir a composição das consultas de progresso quando a base REST utiliza `?rest_route=`, preservando os parâmetros da rota e do identificador da operação.

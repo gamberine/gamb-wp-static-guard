@@ -4,7 +4,7 @@
 
 Extensão para WordPress destinada à geração de sites estáticos, à publicação em diretório local ou arquivo ZIP e à redução da exposição de informações técnicas na saída pública.
 
-**Versão de referência:** 5.1.1. **Licença:** GPL-2.0-or-later. **Manutenção:** [gamberine](https://github.com/gamberine).
+**Versão de referência:** 5.2.0. **Licença:** GPL-2.0-or-later. **Manutenção:** [gamberine](https://github.com/gamberine).
 
 ## Finalidade e limites
 
@@ -29,6 +29,8 @@ Endereços opacos não constituem controle de acesso. Arquivos publicados perman
 - Sanitização final por padrões, whitelist de estilos e verificação de shortcodes não resolvidos.
 - SRI remoto HTTPS com cache, preconnect, proteção de links e defer de scripts locais.
 - Atualizações pelo GitHub Releases integradas aos controles nativos do WordPress e revalidação após atualizações.
+- Badges de STATIC e GUARD derivadas do diagnóstico e da auditoria, com estados de atenção, impedimento, ausência de evidência e revalidação pendente.
+- Menu administrativo com estilos próprios em todas as telas, cabeçalho responsivo sem Bootstrap e controles de backup alinhados.
 - Cópias administrativas do banco ou do banco com tema e extensões. O segundo pacote requer a extensão ZIP e não abrange uploads nem toda a instalação.
 
 ## Instalação

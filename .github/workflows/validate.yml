@@ -24,6 +24,7 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - run: python3 scripts/build.py
+      - run: node --check assets/admin-ui.js && node tests/admin-ui.cjs
       - run: git diff --check
   html-api:
     name: HTML API (WordPress ${{ matrix.wordpress }})

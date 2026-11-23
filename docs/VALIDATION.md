@@ -1,5 +1,15 @@
 # Registro de validação
 
+## Versão 5.2.0 - 23/11/2026
+
+Foram concluídas 208 verificações independentes em PHP 8.3 e 225 com a HTML API do WordPress instalado. As regressões adicionais cobrem ausência de diagnóstico ou auditoria, alertas, impedimentos, relatórios de outra versão, revalidação pendente, auditoria sem documentos e separação dos estilos globais do menu em quatro contextos administrativos. A leitura das badges não altera as opções de diagnóstico.
+
+A suíte JavaScript verifica atualização das três badges, transição de impedimento para sucesso, URL e nomes acessíveis dos controles de backup, cancelamento da exclusão, recusa durante outra operação e lista vazia. A integração contínua executa essa suíte junto à distribuição, além das matrizes PHP 8.1 a 8.4 e HTML API do WordPress 6.2 e versão estável corrente.
+
+A prévia usa o markup candidato do painel, as folhas nativas do WordPress e dados fictícios de backups. A renderização Chromium em 1440 e 390 px confirmou ausência de transbordamento na página, cabeçalho horizontal/vertical, logotipo carregado e botões com a mesma altura e gap de 8 px. A tabela mantém rolagem horizontal própria em telas estreitas. Essa conferência não constitui auditoria integral de acessibilidade nem validação de todos os fluxos administrativos.
+
+Os 22 arquivos PHP de distribuição e testes passaram pela análise de sintaxe. O pacote é produzido pelo gerador determinístico existente; o download publicado e a instalação consumidora devem ser conferidos por hash no fechamento da implantação. Nenhuma opção editorial, destino de publicação, cópia de banco ou configuração de rede integra a distribuição.
+
 ## Versão 5.1.1 - 19/11/2026
 
 Mantidas as 172 verificações independentes e 189 com a HTML API. O navegador utilizou a base REST em formato `?rest_route=` contra o WordPress real, conferindo carregamento, navegação e acompanhamento de uma operação com identificador no parâmetro de consulta. Não foi alterada a estrutura de links permanentes do consumidor.
