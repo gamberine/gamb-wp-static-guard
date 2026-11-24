@@ -10,7 +10,7 @@ final class Publication_View {
     public static function settings_error(array $settings): ?string {
         if(($settings['public_site_mode']??'wordpress')!=='static')return null;
         if(($settings['delivery_method']??'')!=='local')return 'A apresentação estática na raiz requer entrega local.';
-        foreach(array('destination_scheme','destination_host','relative_path')as$key){if(!is_string($settings[$key]??''))return 'Invalid destination value.';}
+        foreach(array('destination_scheme','destination_host','relative_path')as$key){if(!is_string($settings[$key]??''))return 'Valor de destino invalido.';}
         $home=Destination_Audit::base(home_url('/'));
         $base=($settings['destination_scheme']??'https://').($settings['destination_host']??'');
         $hostPath=wp_parse_url($base,PHP_URL_PATH);

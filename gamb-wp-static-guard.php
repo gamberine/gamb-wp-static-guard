@@ -4,7 +4,7 @@ declare(strict_types=1);
  * Plugin Name: Gamb WP Static Guard
  * Plugin URI: https://github.com/gamberine/gamb-wp-static-guard
  * Description: Exportação estática, publicação local, pesquisa no navegador e controles de exposição para WordPress.
- * Version: 5.3.0
+ * Version: 5.4.0
  * Requires at least: 6.2
  * Requires PHP: 8.1
  * Author: Gamb
@@ -18,7 +18,7 @@ declare(strict_types=1);
 if ( ! defined( 'ABSPATH' ) ) { exit; }
 define( 'GAMB_STATIC_WP_PATH', plugin_dir_path( __FILE__ ) );
 define( 'GAMB_STATIC_WP_URL', untrailingslashit( plugin_dir_url( __FILE__ ) ) );
-define( 'GAMB_STATIC_WP_VERSION', '5.3.0' );
+define( 'GAMB_STATIC_WP_VERSION', '5.4.0' );
 foreach ( array( 'options', 'operation-progress', 'publication-status', 'version-monitor', 'dom-parser', 'static-sanitizer', 'static-auditor', 'github-updater', 'frontend-policy', 'guard-suite', 'backup-service', 'publication-destination', 'admin-insights', 'destination-audit', 'audit-connectors', 'publication-view', 'static-engine', 'installation-checks', 'admin' ) as $module ) {
     require_once GAMB_STATIC_WP_PATH . 'src/class-gamb-' . $module . '.php';
 }

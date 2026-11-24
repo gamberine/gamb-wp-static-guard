@@ -4,7 +4,7 @@ Tags: static-site, export, security, local-search
 Requires at least: 6.2
 Tested up to: 7.1
 Requires PHP: 8.1
-Stable tag: 5.3.0
+Stable tag: 5.4.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/old-licenses/gpl-2.0.html
 
@@ -37,6 +37,11 @@ Repositório, documentação e versões:
 https://github.com/gamberine/gamb-wp-static-guard
 
 == Registro de versões ==
+
+= 5.4.0 =
+Auditoria defensiva da entrega e do destino, referência parcial ao OWASP ASVS,
+relatórios existentes do Tenable WAS e Cymulate pendente. Apresentação configurável
+de WordPress ou estático na URL principal, sem modificar a configuração global do host.
 
 = 5.3.0 =
 Área de análises e auditoria detalhada, inventário, verificação/criação segura de pasta,

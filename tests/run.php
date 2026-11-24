@@ -4,7 +4,7 @@ declare(strict_types=1);
 $site = __DIR__ . '/runtime/site/';
 foreach ( array( '', 'wp-content/themes/example/', 'wp-content/uploads/', 'wp-content/plugins/', 'wp-includes/' ) as $part ) { if ( ! is_dir( $site . $part ) ) { mkdir( $site . $part, 0777, true ); } }
 file_put_contents( $site . 'wp-content/themes/example/style.css', 'body{color:#123456}' );
-define( 'ABSPATH', $site ); define( 'WP_CONTENT_DIR', $site . 'wp-content' ); define( 'WP_PLUGIN_DIR', WP_CONTENT_DIR . '/plugins' ); define( 'WPINC', 'wp-includes' ); define( 'AUTH_KEY', 'automated-fixture-not-a-production-secret' ); define( 'GAMB_STATIC_WP_VERSION', '5.3.0' );
+define( 'ABSPATH', $site ); define( 'WP_CONTENT_DIR', $site . 'wp-content' ); define( 'WP_PLUGIN_DIR', WP_CONTENT_DIR . '/plugins' ); define( 'WPINC', 'wp-includes' ); define( 'AUTH_KEY', 'automated-fixture-not-a-production-secret' ); define( 'GAMB_STATIC_WP_VERSION', '5.4.0' );
 $legacy_key = base64_decode( 'c2ltcGx5LXN0YXRpYw==' );
 $legacy = array( 'use_minify' => false, 'relative_path' => '0', 'local_dir' => '/dedicated/output', 'ss_single_auto_export' => false, 'ss_single_auto_export_delay' => 0 );
 $GLOBALS['fixture_options'] = array( $legacy_key => $legacy );
