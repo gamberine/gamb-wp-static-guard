@@ -30,7 +30,7 @@ class Publication_Status {
     public static function revision(): string { return (string)get_option(self::REVISION,''); }
     public static function destination(): string {
         $options=Options::instance(); $values=array();
-        foreach (array('delivery_method','local_dir','destination_url_type','relative_path','destination_host') as $key) { $values[$key]=$options->get($key,''); }
+        foreach (array('delivery_method','local_dir','destination_url_type','relative_path','destination_host','destination_scheme','destination_environment') as $key) { $values[$key]=$options->get($key,''); }
         return hash('sha256',wp_json_encode($values));
     }
     public static function complete(string $revision): void {

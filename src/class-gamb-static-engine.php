@@ -254,6 +254,8 @@ class Static_Engine {
 			wp_mkdir_p( dirname( $archive_dir . $manual_path ) );
 			$this->write_export_file( $archive_dir . $manual_path, Installation_Checks::finalize_document( Admin_Insights::manual_html(), $manual_path ) );
 			$exported_cnt++;
+            $this->write_export_file($archive_dir.Publication_View::RECEIPT,wp_json_encode(array('public_url'=>$this->public_base_url(),'environment'=>$opts->get('destination_environment','production'),'published_at'=>gmdate('c'))));
+            $exported_cnt++;
 		}
 		Gamb_Static_Auditor::audit_directory( $archive_dir );
 

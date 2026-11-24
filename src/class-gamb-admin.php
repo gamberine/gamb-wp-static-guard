@@ -46,8 +46,9 @@ class Admin_Controller
             return;
         }
         wp_enqueue_style('gamb-guard-admin', GAMB_STATIC_WP_URL . '/assets/admin-ui.css', array('gamb-guard-menu'), $this->asset_version('admin-ui.css'));
+        wp_enqueue_script('gamb-destination-audit', GAMB_STATIC_WP_URL . '/assets/destination-audit.js', array(), $this->asset_version('destination-audit.js'), true);
         wp_enqueue_script('gamb-guard-insights', GAMB_STATIC_WP_URL . '/assets/admin-insights.js', array(), $this->asset_version('admin-insights.js'), true);
-        wp_enqueue_script('gamb-guard-admin', GAMB_STATIC_WP_URL . '/assets/admin-ui.js', array('gamb-guard-insights'), $this->asset_version('admin-ui.js'), true);
+        wp_enqueue_script('gamb-guard-admin', GAMB_STATIC_WP_URL . '/assets/admin-ui.js', array('gamb-guard-insights','gamb-destination-audit'), $this->asset_version('admin-ui.js'), true);
         wp_localize_script('gamb-guard-admin', 'gambGuardData', array('restUrl' => rest_url(self::API . '/'), 'nonce' => wp_create_nonce('wp_rest'),'timezone'=>function_exists('wp_timezone_string')?wp_timezone_string():'UTC','fieldHelp'=>Admin_Insights::help(),'suggestedDirectory'=>wp_normalize_path(ABSPATH.'link-publico')));
     }
     public function register_admin_bar_node($bar)
@@ -110,6 +111,17 @@ class Admin_Controller
             '/check-updates' => array('methods' => 'POST', 'callback' => array($this, 'rest_check_updates')),
             '/audit' => array('methods' => 'POST', 'callback' => array($this, 'rest_audit')),
             '/insights' => array('methods'=>'GET','callback'=>static function($request){return rest_ensure_response(Admin_Insights::snapshot(max(1,absint($request->get_param('page')))));}),
+            '/destination-audit' => array(
+                array('methods'=>'GET','callback'=>static fn()=>rest_ensure_response(array('report'=>Destination_Audit::latest(),'connectors'=>Audit_Connectors::status()))),
+                array('methods'=>'POST','callback'=>static function($request){
+                    if(!wp_verify_nonce((string)$request->get_header('X-WP-Nonce'),'wp_rest'))return new \WP_Error('invalid_nonce','Recarregue o painel para validar a requisição.',array('status'=>403));
+                    return rest_ensure_response(array('report'=>Destination_Audit::run(),'connectors'=>Audit_Connectors::status()));
+                }),
+            ),
+            '/audit-connectors' => array('methods'=>'POST','callback'=>static function($request){
+                if(!wp_verify_nonce((string)$request->get_header('X-WP-Nonce'),'wp_rest'))return new \WP_Error('invalid_nonce','Recarregue o painel para validar a requisição.',array('status'=>403));
+                return Audit_Connectors::save($request);
+            }),
             '/destination' => array('methods'=>'POST','callback'=>static function($request){$result=Publication_Destination::inspect($request->get_param('path'),filter_var($request->get_param('create'),FILTER_VALIDATE_BOOLEAN));if(is_wp_error($result))return new \WP_Error($result->get_error_code(),$result->get_error_message(),array('status'=>400));return rest_ensure_response($result);}),
             '/publication-audit' => array('methods'=>'POST','callback'=>static function(){
                 if (Options::instance()->get('delivery_method')!=='local') { return new \WP_Error('local_delivery_required','A auditoria do destino requer uma entrega local. Para ZIP, confira o pacote e o servidor de destino.',array('status'=>400)); }
@@ -133,7 +145,7 @@ class Admin_Controller
                 }
                 unset($endpoint);
             }
-            $kinds = array('/settings' => 'settings', '/start-export' => 'export', '/apply-single' => 'single', '/diagnostics' => 'diagnostics', '/check-updates' => 'updates', '/audit' => 'audit', '/publication-audit'=>'publication-audit','/destination'=>'destination','/backup' => 'backup', '/backup/delete' => 'backup-delete');
+            $kinds = array('/settings' => 'settings', '/start-export' => 'export', '/apply-single' => 'single', '/diagnostics' => 'diagnostics', '/check-updates' => 'updates', '/audit' => 'audit', '/publication-audit'=>'publication-audit','/destination'=>'destination','/destination-audit'=>'destination-audit','/audit-connectors'=>'audit-connectors','/backup' => 'backup', '/backup/delete' => 'backup-delete');
             $wrap = static function ($endpoint) use ($route, $kinds) {
                 if (isset($kinds[$route]) && $endpoint['methods'] === 'POST') {
                     $callback = $endpoint['callback'];
@@ -202,6 +214,7 @@ class Admin_Controller
         $options = Options::instance();
         $defaults = Options::get_default_options();
         $params = $request->get_params();
+        if(isset($params['public_site_mode'])&&!in_array($params['public_site_mode'],array('wordpress','static'),true))return new \WP_Error('invalid_presentation','Selecione WordPress ou publicação estática.',array('status'=>400));
         foreach (array('version_monitor_allowed_ips', 'version_monitor_trusted_proxies') as $key) {
             if (array_key_exists($key, $params)) {
                 $parsed = Version_Monitor::validate_list($params[$key]);
@@ -250,6 +263,9 @@ class Admin_Controller
             if(is_wp_error($destination)){return new \WP_Error('invalid_local',$destination->get_error_message(),array('status'=>400));}
             $params['local_dir']=$destination;
         }
+        if(isset($params['destination_url_type'])&&!in_array($params['destination_url_type'],array('relative','absolute','offline'),true))return new \WP_Error('invalid_url_type','Formato de endereços inválido.',array('status'=>400));
+        $presentation=Publication_View::settings_error(array_merge($options->get_all(),$params));
+        if($presentation)return new \WP_Error('invalid_presentation',$presentation,array('status'=>400));
         if ('' !== $new_token || $clear_token) {
             Gamb_GitHub_Updater::instance()->clear_cache();
             if (! Gamb_GitHub_Updater::instance()->set_token($clear_token ? '' : $new_token)) {
@@ -273,7 +289,7 @@ class Admin_Controller
             } else {
                 continue;
             }
-            if (!str_starts_with($key, 'version_monitor_') && !str_starts_with($key, 'github_') && $options->get($key) !== $value) {
+            if ($key!=='public_site_mode' && !str_starts_with($key, 'version_monitor_') && !str_starts_with($key, 'github_') && $options->get($key) !== $value) {
                 $publication_changed = true;
             }
             $options->set($key, $value);
@@ -433,7 +449,7 @@ class Admin_Controller
                     <details class="gamb-sidebox gamb-analysis-box" name="gamb-sections">
                         <summary><span>3. Análises e auditoria</span></summary>
                         <nav class="gamb-admin-nav" aria-label="Análises e auditoria">
-                            <?php foreach (array('analysis'=>'Resumo e pendências','publication-audit'=>'Auditoria da publicação','origin-audit'=>'Auditoria da origem','diagnostics'=>'Diagnóstico da instalação','dependencies'=>'Dependências externas','files'=>'Arquivos publicados') as $tab=>$label) : ?>
+                            <?php foreach (array('destination-audit'=>'Auditoria','analysis'=>'Resumo e pendências','publication-audit'=>'Auditoria da publicação','origin-audit'=>'Auditoria da origem','diagnostics'=>'Diagnóstico da instalação','dependencies'=>'Dependências externas','files'=>'Arquivos publicados') as $tab=>$label) : ?>
                             <button type="button" class="button" data-tab="<?php echo esc_attr($tab); ?>" aria-controls="panel-<?php echo esc_attr($tab); ?>" aria-pressed="false"><?php echo esc_html($label); ?></button>
                             <?php endforeach; ?>
                         </nav>
@@ -502,6 +518,14 @@ class Admin_Controller
                     </section>
                     <section class="gamb-panel" id="panel-settings" hidden>
                         <h2>Destino e endereços</h2>
+                        <div class="gamb-callout">
+                            <label class="gamb-field" for="gamb-public-site-mode">O que abrir na URL principal do projeto</label>
+                            <select id="gamb-public-site-mode" data-opt="public_site_mode"><option value="wordpress" <?php selected($options['public_site_mode']??'wordpress','wordpress'); ?>>WordPress</option><option value="static" <?php selected($options['public_site_mode']??'wordpress','static'); ?>>Publicação estática na URL principal</option></select>
+                            <p>URL principal: <a href="<?php echo esc_url(home_url('/')); ?>" target="_blank" rel="noopener noreferrer"><?php echo esc_html(home_url('/')); ?></a></p>
+                            <button type="button" class="button" data-use-project-url data-project-url="<?php echo esc_url(home_url('/')); ?>">Usar endereço local do projeto</button>
+                            <p data-public-site-status><?php echo esc_html(Publication_View::status()['message']); ?></p>
+                            <small>O modo estático exige entrega local na URL principal e uma publicação completa correspondente. O admin continua acessível; retornar a WordPress não remove os arquivos exportados.</small>
+                        </div>
                         <div class="gamb-callout"><strong>Endereço público salvo</strong><p><a data-publication-url href="<?php echo esc_url($public_url); ?>" target="_blank" rel="noopener noreferrer"><?php echo esc_html($public_url ?: 'Configure o domínio público do destino.'); ?></a></p><p data-proposed-url></p><small>A pasta física e a URL são configurações distintas. O servidor precisa apontar esse endereço para a pasta escolhida; criar a pasta não configura DNS, certificado ou host virtual.</small></div>
                         <div class="gamb-form-grid">
                         <div>
@@ -620,6 +644,23 @@ class Admin_Controller
                         <button type="button" class="button button-primary gamb-save-settings-btn">Salvar configurações</button>
                         <p>O gate examina o buffer original e o HTML final. Um impedimento CRITICAL interrompe a entrega e preserva a publicação existente.</p>
                         <button type="button" class="button" data-open-panel="publication-audit">Abrir resultados da publicação</button>
+                    </section>
+                    <section class="gamb-panel" id="panel-destination-audit" hidden>
+                        <h2>Auditoria</h2>
+                        <p>Verificações defensivas de leitura da última exportação e de até quatro URLs do destino salvo. Referência: OWASP ASVS 5.0.0, com cobertura parcial. Canonical e robots são critérios de publicação. Não reexporta, não corrige o site e não inicia testes externos.</p>
+                        <button type="button" class="button button-primary" data-run-destination-audit>Executar auditoria</button>
+                        <a class="button" data-report-download="defensive">Baixar resultado (JSON)</a>
+                        <p data-destination-audit-message role="status" aria-live="polite"></p>
+                        <div data-destination-audit-report></div>
+                        <details><summary>Conectores opcionais — somente relatórios existentes</summary>
+                            <h3>Tenable WAS</h3><p>Associe uma avaliação existente à URL e ao ambiente atualmente salvos. Use uma conta com WAS.SCAN_WAS.READ e Can View, sem permissão de iniciar ou editar avaliações. O plugin não verifica privilégios excedentes da chave.</p>
+                            <p>Chaves somente no servidor: constantes ou variáveis de ambiente <code>GAMB_TENABLE_ACCESS_KEY</code> e <code>GAMB_TENABLE_SECRET_KEY</code>. Nenhuma chave é enviada ao navegador ou registrada no relatório.</p>
+                            <label class="gamb-setting"><input type="checkbox" data-tenable-enabled> Consultar Tenable durante a auditoria</label>
+                            <label class="gamb-field" for="gamb-tenable-scan">UUID da avaliação existente <span title="Identificador retornado pelo Tenable. Não é uma URL nem uma credencial.">ⓘ</span></label><input class="regular-text" id="gamb-tenable-scan" data-tenable-scan autocomplete="off" maxlength="36" placeholder="00000000-0000-0000-0000-000000000000">
+                            <label class="gamb-setting"><input type="checkbox" data-tenable-readonly> Confirmo que a conta foi limitada à leitura e pode visualizar esta avaliação.</label>
+                            <p data-tenable-status></p><button type="button" class="button" data-save-audit-connectors>Salvar associação ao destino atual</button>
+                            <h3>Cymulate</h3><p>Pendente, desativado e sem interferência na auditoria. Será usado quando o endpoint de leitura e as permissões da conta forem confirmados e o conector for habilitado. Nenhuma requisição é feita nesta versão.</p>
+                        </details>
                     </section>
                     <section class="gamb-panel" id="panel-analysis" hidden>
                         <h2>Análises e auditoria</h2><p>Consulte as causas dos alertas, a cobertura de cada verificação e as providências recomendadas. Os relatórios desta área são administrativos e podem conter a estrutura da publicação.</p>

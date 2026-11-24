@@ -2,6 +2,15 @@
 
 Este documento distingue a incorporação histórica das novas alterações. As datas correspondem ao registro verificável, sem reconstruir datas de commits inexistentes.
 
+## 5.4.0 - 2026-11-24
+
+- Adicionar a aba Auditoria com verificações defensivas de leitura da última entrega local e de até quatro URLs derivadas do destino salvo, sem redirecionamentos ou entrada de URLs arbitrárias.
+- Separar publicação, exportação e servidor; registrar esperado, observado, correção, quatro estados e referência parcial ao ASVS 5.0.0.
+- Conferir canonical/robots, SRI de CSS local, MIME/nosniff de PDF/DOCX, referências internas, arquivos indevidos e headers; preservar análise local quando o host não responde e não presumir existência de WAF.
+- Consultar somente avaliações/relatórios existentes do Tenable WAS, vinculados ao alvo/ambiente, com chaves somente no servidor; preservar o resultado local em falhas de integração. Cymulate permanece pendente, sem chamadas.
+- Permitir escolher no admin WordPress ou publicação estática na URL principal, com facilitador do endereço local, entrega vinculada a destino/ambiente, admin/API/captura preservados e nenhum ajuste global de servidor.
+- Consolidar os históricos equivalentes das branches antigas sem reintroduzir código já substituído; manter proteção da main e validações obrigatórias.
+
 ## 5.3.0 - 2026-11-24
 
 - Separar configurações e evidências em Análises e auditoria, com relatórios independentes da origem e publicação, controles executados, documentos, correções e downloads administrativos protegidos.

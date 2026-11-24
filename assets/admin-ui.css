@@ -732,5 +732,7 @@
 [data-audit-report], [data-dependency-list], [data-navigation-list] { overflow-wrap: anywhere; }
 .gamb-admin [data-report-download][aria-disabled=true] { opacity: .65; cursor: wait; }
 .gamb-analysis-box > summary { border-left: 4px solid #3346b0; }
+[data-destination-audit-report] { overflow-wrap: anywhere; }
+[data-destination-audit-report] pre { white-space: pre-wrap; word-break: break-word; }
 .gamb-admin .gamb-info:focus-visible, .gamb-static-problem:focus-visible, .gamb-quick-links a:focus-visible { outline: 3px solid #3455c5; outline-offset: 3px; }
 @media (max-width: 600px) { .gamb-quick-links { margin-left: 0; width: 100%; } .gamb-stats { grid-template-columns: 1fr; } }
