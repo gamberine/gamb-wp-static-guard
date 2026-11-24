@@ -84,6 +84,7 @@ class Options {
 			'refresh_local_integrity'          => true,
 			'disable_local_integrity'          => false, // Somente destinos cujo CDN/proxy transforma os bytes.
 			'destination_environment'          => 'production', // production | preview | homologation
+            'public_site_mode'                 => 'wordpress', // wordpress | static at the existing home URL
 			'require_local_dependencies'       => false,
 			'add_feeds'                        => false,
 			'add_rest_api'                     => false,

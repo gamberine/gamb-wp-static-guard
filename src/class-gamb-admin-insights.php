@@ -26,6 +26,7 @@ final class Admin_Insights {
     }
     public static function help(): array {
         $rows=array(
+            'public_site_mode'=>array('Escolhe o que abre na URL principal do projeto. O modo estático lê a entrega local; admin, API e captura assinada continuam no WordPress. Não altera Apache, DNS ou outros projetos.','No Laragon, use o endereço local do projeto, publique o site completo e escolha Publicação estática na URL principal.'),
             'delivery_method'=>array('Escolhe como entregar o resultado. A pasta local recebe os arquivos; ZIP gera um pacote para transporte.','Use Diretório local no servidor que já hospeda o preview.'),
             'local_dir'=>array('Pasta física exclusiva no servidor. A verificação é somente leitura; Criar pasta exige ação explícita. Não define a URL pública.','Use a sugestão de pasta e clique em Verificar pasta antes de salvar.'),
             'destination_url_type'=>array('Relativo ao domínio usa caminhos públicos; Absoluto inclui protocolo e domínio; Relativo ao arquivo usa caminhos entre arquivos.','Para um site servido na raiz, use Relativo ao domínio e deixe o caminho público vazio.'),
@@ -70,10 +71,10 @@ final class Admin_Insights {
         $tips=array('zip'=>'A exportação possui alternativa ZIP do WordPress. Para o backup completo, habilite a extensão ZIP no PHP do ambiente ou utilize o backup de banco.','html_parser'=>'Habilite DOM e mbstring no PHP e refaça o diagnóstico.','crypto'=>'Confira OpenSSL e suporte a HMAC SHA-256 antes de publicar.','canonical'=>'Confira o domínio, protocolo e caminho públicos e reexporte para normalizar a canonical.','error_template'=>'Teste uma rota inexistente. O modelo de apoio é usado em temas clássicos compatíveis sem modelo 404.','cron'=>'Configure o agendador do ambiente ou faça a publicação manual.','dependencies'=>'Abra Dependências externas; identifique o serviço, licença e necessidade antes de internalizar.','home'=>'Confira a URL da origem e os permalinks; a Home deve responder no contexto esperado.','error'=>'Teste a página inexistente e o template 404 da origem.');
         return $tips[$id]??'Revise a mensagem, corrija a origem quando necessário e execute novamente o diagnóstico.';
     }
-    public static function publication(int $page = 1, bool $full = false): array {
+    public static function publication(int $page = 1, bool $full = false, bool $audit_read_only = false): array {
         $opts=Options::instance();try{$public_url=Static_Engine::get_instance()->public_base_url();}catch(\Throwable $error){$public_url='';} $info=array('public_url'=>$public_url,'environment'=>$opts->get('destination_environment','production'),'method'=>$opts->get('delivery_method'),'directory'=>$opts->get('local_dir',''),'processed_units'=>(int)$opts->get('last_export_files_count',0),'published_at'=>$opts->get('last_export_time',''),'files'=>array(),'count'=>0,'page'=>max(1,$page),'per_page'=>100,'inventory_available'=>false,'message'=>'O inventário será disponibilizado após uma entrega local com manifesto.');
         if ($info['method']!=='local') { $info['message']='Entrega em ZIP: consulte o pacote gerado. A listagem local não certifica o conteúdo do pacote.'; return $info; }
-        $root=Publication_Destination::validate($info['directory']); if (is_wp_error($root)) { $info['message']=$root->get_error_message(); return $info; }
+        $root=Publication_Destination::validate($info['directory'],$audit_read_only); if (is_wp_error($root)) { $info['message']=$root->get_error_message(); return $info; }
         $manifest=trailingslashit($root).'.gamb-static-files.json';
         if (!is_file($manifest)||is_link($manifest)||filesize($manifest)>2097152) { return $info; }
         $paths=json_decode((string)file_get_contents($manifest),true);if (!is_array($paths)||count($paths)>20000) { return $info; }
@@ -94,15 +95,16 @@ final class Admin_Insights {
         foreach ($installation['checks']??array() as $check) { if (($check['status']??'')!=='ok') { $check['how_to_fix']=self::recommendations((string)($check['id']??''));$alerts[]=$check; } }
         if (empty($installation['checked_at'])) { $alerts[]=array('id'=>'missing_diagnostics','status'=>'warning','message'=>'O diagnóstico da instalação ainda não foi executado.','how_to_fix'=>'Execute Verificar instalação nesta área.'); }
         $publication=get_option(Gamb_Static_Auditor::PUBLICATION_OPTION,array());$origin=get_option(Gamb_Static_Auditor::ORIGIN_OPTION,array());$legacy=get_option(Gamb_Static_Auditor::REPORT_OPTION,array());
-        return array('installation'=>$installation,'alerts'=>$alerts,'dependencies'=>$resources,'publication_audit'=>$publication,'origin_audit'=>$origin,'previous_audit'=>(!$publication&&!$origin)?$legacy:array(),'publication'=>self::publication($page),'downloads'=>array_map(static fn($type)=>html_entity_decode(wp_nonce_url(admin_url('admin-post.php?action=gamb_guard_report&type='.$type),'gamb_guard_report_'.$type),ENT_QUOTES,'UTF-8'),array_combine(array('summary','publication','origin','files'),array('summary','publication','origin','files'))));
+        return array('presentation'=>Publication_View::status(),'installation'=>$installation,'alerts'=>$alerts,'dependencies'=>$resources,'publication_audit'=>$publication,'origin_audit'=>$origin,'previous_audit'=>(!$publication&&!$origin)?$legacy:array(),'publication'=>self::publication($page),'downloads'=>array_map(static fn($type)=>html_entity_decode(wp_nonce_url(admin_url('admin-post.php?action=gamb_guard_report&type='.$type),'gamb_guard_report_'.$type),ENT_QUOTES,'UTF-8'),array_combine(array('summary','publication','origin','files','defensive'),array('summary','publication','origin','files','defensive'))));
     }
     public static function download(): void {
         if (!current_user_can('manage_options')) { wp_die('Acesso não autorizado.','',array('response'=>403)); }
         $type=isset($_GET['type'])?sanitize_key(wp_unslash($_GET['type'])):'';
-        if (!in_array($type,array('summary','publication','origin','files'),true)) { wp_die('Relatório inválido.','',array('response'=>400)); }
+        if (!in_array($type,array('summary','publication','origin','files','defensive'),true)) { wp_die('Relatório inválido.','',array('response'=>400)); }
         check_admin_referer('gamb_guard_report_'.$type);
         if ($type==='files') { $data=self::publication(1,true); }
         elseif ($type==='summary') { $data=self::snapshot();unset($data['downloads']);$data['publication']=self::publication(1,true); }
+        elseif ($type==='defensive') { $data=Destination_Audit::latest(); }
         else { $data=get_option($type==='origin'?Gamb_Static_Auditor::ORIGIN_OPTION:Gamb_Static_Auditor::PUBLICATION_OPTION,array()); }
         while(ob_get_level()>0){if(!@ob_end_clean())break;}
         nocache_headers();header('Cache-Control: private, no-store');header('Content-Type: application/json; charset=UTF-8');header('X-Content-Type-Options: nosniff');header('Content-Disposition: attachment; filename="gamb-relatorio-'.$type.'.json"');
