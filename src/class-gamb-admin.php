@@ -319,9 +319,6 @@ class Admin_Controller
     public function rest_create_backup($request)
     {
         $type = $request->get_param('type') === 'full' ? 'full' : 'db';
-        if ('full' === $type && ! class_exists('\ZipArchive')) {
-            return new \WP_Error('zip_required', 'O pacote de banco, tema e extensões requer a extensão ZIP. O backup de banco permanece disponível.', array('status' => 422));
-        }
         return rest_ensure_response(Backup_Service::create_backup($type));
     }
     public function rest_delete_backup($request)
