@@ -127,10 +127,15 @@ class Gamb_Security_Suite {
 
 	public static function is_public_asset( $relative ) {
 		$relative = str_replace( "\\", "/", (string) $relative );
+		if ( preg_match( '~(?:^|/)(?:' . self::private_asset_pattern() . ')$~i', $relative ) ) { return false; }
 		if ( preg_match( '~(?:^|/)(?:\.[^/]*|gamb-(?:backups|static-guard-(?:backups|archive))|backups?(?:[-_][^/]*)?)(?:/|$)~i', $relative ) ) { return false; }
 		if ( preg_match( '/\.(?:php[0-9]*|phtml|phar)(?:\.|$)/i', basename( $relative ) ) ) { return false; }
 		$extension = strtolower( pathinfo( $relative, PATHINFO_EXTENSION ) );
 		return in_array( $extension, array( 'css', 'js', 'mjs', 'json', 'jpg', 'jpeg', 'png', 'gif', 'webp', 'avif', 'svg', 'ico', 'woff2', 'woff', 'ttf', 'eot', 'otf', 'pdf', 'mp4', 'webm', 'doc', 'docx', 'xls', 'xlsx', 'zip' ), true );
+	}
+
+	private static function private_asset_pattern() {
+		return '.*\\.map(?:\\.(?:gz|br))?|(?:package(?:-lock)?|npm-shrinkwrap|composer|bower)\\.json|(?:tsconfig|jsconfig)(?:\\.[A-Za-z0-9_-]+)?\\.json|(?:webpack|vite|rollup)\\.config\\.(?:js|mjs|cjs)|(?:gulpfile|gruntfile)\\.(?:js|mjs|cjs)';
 	}
 
 	public static function get_base_dir_for_kind( $kind ) {
@@ -212,29 +217,8 @@ class Gamb_Security_Suite {
 			exit;
 		}
 
-		$mime_map = array(
-			"css"   => "text/css; charset=UTF-8",
-			"js"    => "application/javascript; charset=UTF-8",
-			"mjs"   => "application/javascript; charset=UTF-8",
-			"json"  => "application/json; charset=UTF-8",
-			"jpg"   => "image/jpeg",
-			"jpeg"  => "image/jpeg",
-			"png"   => "image/png",
-			"gif"   => "image/gif",
-			"webp"  => "image/webp",
-			"avif"  => "image/avif",
-			"svg"   => "image/svg+xml",
-			"ico"   => "image/x-icon",
-			"woff2" => "font/woff2",
-			"woff"  => "font/woff",
-			"ttf"   => "font/ttf",
-			"eot"   => "application/vnd.ms-fontobject",
-			"otf"   => "font/otf",
-			"mp4"   => "video/mp4",
-			"webm"  => "video/webm",
-			"pdf"   => "application/pdf",
-		);
-		$content_type = isset( $mime_map[ $ext ] ) ? $mime_map[ $ext ] : "application/octet-stream";
+		$content_type = self::asset_mime_types()[ $ext ] ?? 'application/octet-stream';
+		if ( in_array( $ext, array( 'css', 'js', 'mjs', 'json' ), true ) ) { $content_type .= '; charset=UTF-8'; }
 
 		if ( ! headers_sent() ) {
 			status_header( 200 );
@@ -262,13 +246,53 @@ class Gamb_Security_Suite {
 		exit;
 	}
 
+	/** Mesmo mapa no handler WordPress e nas regras de publicação Apache. */
+	public static function asset_mime_types() {
+		return array(
+			"css"   => "text/css",
+			"js"    => "application/javascript",
+			"mjs"   => "application/javascript",
+			"json"  => "application/json",
+			"jpg"   => "image/jpeg",
+			"jpeg"  => "image/jpeg",
+			"png"   => "image/png",
+			"gif"   => "image/gif",
+			"webp"  => "image/webp",
+			"avif"  => "image/avif",
+			"svg"   => "image/svg+xml",
+			"ico"   => "image/x-icon",
+			"woff2" => "font/woff2",
+			"woff"  => "font/woff",
+			"ttf"   => "font/ttf",
+			"eot"   => "application/vnd.ms-fontobject",
+			"otf"   => "font/otf",
+			"mp4"   => "video/mp4",
+			"webm"  => "video/webm",
+			"pdf"   => "application/pdf",
+			"doc"   => "application/msword",
+			"docx"  => "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+			"xls"   => "application/vnd.ms-excel",
+			"xlsx"  => "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+			"zip"   => "application/zip",
+		);
+	}
+
 	public function sanitize_js_content( $js ) {
 		if ( ! is_string( $js ) || "" === $js ) {
 			return $js;
 		}
 		if ( Options::instance()->get( "guard_hide_theme_identity", true ) ) {
 			$js = preg_replace_callback( "#^\\s*(?:/\\*[\\s\\S]*?\\*/\\s*)+#", static function( $match ) { return self::strip_non_license_comments( $match[0] ); }, $js );
-			$js = preg_replace( "~//[#@][ \\t]*source(?:Mapping)?URL=[^\\r\\n]*~", "", $js );
+			// Only trailing directives: matching comment-like text inside JS strings changes behavior.
+			do {
+				$before = $js;
+				$js = preg_replace( '~(?:^|\r?\n)[\t ]*//[#@][\t ]*source(?:Mapping)?URL=[^\s"\x27`*]+[\t ]*\s*\z~', "\n", $js );
+				$js = preg_replace_callback( '~\A([\s\S]*?)/\*[#@][\t ]*source(?:Mapping)?URL=[^\s"\x27`*]+\s*\*/\s*\z~', static function( $m ) {
+					$prefix = preg_replace( '~\A\s*(?:/\*[\s\S]*?\*/\s*)+~', '', $m[1] );
+					// Ambiguous earlier block delimiters: keep the comment, block access to its map instead.
+					return false === strpos( $prefix, '/*' ) ? $m[1] . "\n" : $m[0];
+				}, $js );
+			} while ( $before !== $js );
 		}
 		return $js;
 	}
@@ -593,7 +617,7 @@ class Gamb_Security_Suite {
 		$plugin_basedir  = defined( "WP_PLUGIN_DIR" ) ? WP_PLUGIN_DIR : ( WP_CONTENT_DIR . "/plugins" );
 
 		$origin = untrailingslashit( home_url() );
-		$origin_prefix = "(?:" . preg_quote( $origin, "#" ) . "|" . preg_quote( (string) parse_url( $origin, PHP_URL_PATH ), "#" ) . ")?";
+		$origin_prefix = "(?<![A-Za-z0-9_:/.-])(?:" . preg_quote( $origin, "#" ) . "|" . preg_quote( preg_replace( '~^https?:~', '', $origin ), "#" ) . "|" . preg_quote( (string) parse_url( $origin, PHP_URL_PATH ), "#" ) . ")?";
 
 		if ( "" !== $stylesheet_slug ) {
 			$text = preg_replace_callback(
@@ -647,7 +671,7 @@ class Gamb_Security_Suite {
 		);
 
 		$text = preg_replace_callback(
-			"#(?:https?:\\\\/\\\\/" . preg_quote( $host, "#" ) . ")?\\\\/wp-content\\\\/plugins\\\\/([a-zA-Z0-9._-]+(?:\\\\/[a-zA-Z0-9._-]+)*)\\\\/#i",
+			"#(?<![A-Za-z0-9_:/.-])(?:https?:\\\\/\\\\/" . preg_quote( $host, "#" ) . ")?\\\\/wp-content\\\\/plugins\\\\/([a-zA-Z0-9._-]+(?:\\\\/[a-zA-Z0-9._-]+)*)\\\\/#i",
 			function ( $m ) {
 				$dir_rel = str_replace( "\\/", "/", $m[1] );
 				$tok     = self::encrypt_token( "d", $dir_rel );
@@ -790,9 +814,12 @@ class Gamb_Security_Suite {
 				continue;
 			}
 			$rel  = str_replace( "\\", "/", substr( $path, $base_len ) );
+			if ( ! self::is_public_asset( $rel ) ) { continue; }
 			$dest = trailingslashit( $dst_dir ) . $rel;
 			@wp_mkdir_p( dirname( $dest ) );
-			@copy( $path, $dest );
+			if ( in_array( $ext, array( 'js', 'mjs' ), true ) ) {
+				Static_Engine::get_instance()->write_export_file( $dest, $this->sanitize_js_content( (string) file_get_contents( $path ) ) );
+			} elseif ( ! @copy( $path, $dest ) ) { throw new \RuntimeException( 'Falha ao copiar recurso público.' ); }
 		}
 	}
 
@@ -1004,7 +1031,9 @@ PHP;
 	}
 
 	public static function get_htaccess_content() {
-		$base = rtrim( '/' . trim( (string) Options::instance()->get( 'relative_path', '' ), '/' ), '/' );
+		// Apache 2.4: requer AllowOverride e mod_rewrite/mod_mime/mod_headers no host.
+		// Reescreve para o arquivo com extensão; não usa T= junto da substituição em .htaccess.
+		$base = rtrim( (string) wp_parse_url( Static_Engine::get_instance()->public_base_url(), PHP_URL_PATH ), '/' );
 		$rules = "Options -Indexes -ExecCGI -Includes\nServerSignature Off\nDirectoryIndex index.html\n";
 		$rules .= "ErrorDocument 404 " . $base . "/404.html\nErrorDocument 403 " . $base . "/404.html\n";
 		$rules .= "<IfModule mod_rewrite.c>\nRewriteEngine On\n";
@@ -1012,15 +1041,20 @@ PHP;
 		$rules .= "RewriteCond %{REQUEST_METHOD} !^(GET|HEAD|OPTIONS)$ [NC]\nRewriteRule ^ - [F,END]\n";
 		$rules .= "RewriteCond %{QUERY_STRING} (?:^|&)author=\\d+ [NC]\nRewriteRule ^ - [F,END]\n";
 		$rules .= "RewriteRule ^(?:wp-admin|wp-login\\.php|xmlrpc\\.php|wp-config\\.php|wp-cron\\.php|wp-json)(?:/|$) - [F,END,NC]\n";
-		foreach ( array( 'css', 'js', 'mjs', 'json', 'woff2', 'woff', 'ttf', 'otf', 'eot', 'webp', 'jpg', 'jpeg', 'png', 'svg', 'gif', 'avif', 'ico', 'pdf', 'mp4', 'webm', 'doc', 'docx', 'xls', 'xlsx', 'zip' ) as $ext ) {
+		foreach ( array_keys( self::asset_mime_types() ) as $ext ) {
 			$rules .= "RewriteCond %{REQUEST_FILENAME}." . $ext . " -f\nRewriteRule ^v/([A-Za-z0-9_-]+)$ v/$1." . $ext . " [END]\n";
 		}
 		// END prevents the parent WordPress front controller from handling missing static files.
 		$rules .= "RewriteCond %{REQUEST_FILENAME} !-f\nRewriteCond %{REQUEST_FILENAME} !-d\nRewriteRule ^ - [R=404,END]\n</IfModule>\n";
 		$rules .= "<FilesMatch \"\\.(?:php[0-9]?|phtml|phar|pl|py|cgi|asp|aspx|jsp|sh|bash|exe|dll)$\">\nRequire all denied\n</FilesMatch>\n";
 		$rules .= "<FilesMatch \"^\\.\">\nRequire all denied\n</FilesMatch>\n";
-		$rules .= "<IfModule mod_mime.c>\nAddType text/css .css\nAddType application/javascript .js .mjs\nAddType application/json .json\nAddType font/woff2 .woff2\nAddType image/avif .avif\n</IfModule>\n";
+		$rules .= '<FilesMatch "(?i)^(?:' . self::private_asset_pattern() . ')$">' . "\nRequire all denied\n</FilesMatch>\n";
+		$rules .= "<FilesMatch \"^[A-Za-z0-9_-]+$\">\nForceType application/octet-stream\n</FilesMatch>\n";
+		$rules .= "<IfModule mod_mime.c>\n";
+		foreach ( self::asset_mime_types() as $ext => $mime ) { $rules .= 'AddType ' . $mime . ' .' . $ext . "\n"; }
+		$rules .= "</IfModule>\n";
 		$rules .= "<IfModule mod_headers.c>\nHeader unset X-Powered-By\nHeader unset X-Pingback\nHeader unset Link\n";
+		if ( Installation_Checks::preview_destination() ) { $rules .= "Header onsuccess unset X-Robots-Tag\nHeader always set X-Robots-Tag \"noindex, nofollow\"\n"; }
 		$rules .= "Header unset Server\nHeader always set Strict-Transport-Security \"max-age=31536000\" env=HTTPS\nHeader always set Permissions-Policy \"camera=(), microphone=(), geolocation=()\"\nHeader always set Cross-Origin-Opener-Policy \"same-origin-allow-popups\"\n";
 		$rules .= "Header always set X-Content-Type-Options \"nosniff\"\nHeader always set X-Frame-Options \"SAMEORIGIN\"\nHeader always set Referrer-Policy \"strict-origin-when-cross-origin\"\n";
 		$rules .= "Header always set Content-Security-Policy \"frame-ancestors 'self'; object-src 'none'; base-uri 'self';\"\n</IfModule>\n";
@@ -1029,6 +1063,7 @@ PHP;
 
 	public static function get_headers_file_content() {
 		return "/*\n"
+			. ( Installation_Checks::preview_destination() ? "  X-Robots-Tag: noindex, nofollow\n" : '' )
 			. "  X-Frame-Options: SAMEORIGIN\n"
 			. "  X-Content-Type-Options: nosniff\n"
 			. "  Referrer-Policy: strict-origin-when-cross-origin\n"

@@ -3,6 +3,10 @@ const path = require('node:path');
 const vm = require('node:vm');
 const assert = require('node:assert/strict');
 const source = fs.readFileSync(path.join(__dirname,'../assets/admin-ui.js'),'utf8');
+const clock={window:{gambGuardData:{timezone:'America/Sao_Paulo'}},Intl,Date};
+vm.runInNewContext(fs.readFileSync(path.join(__dirname,'../assets/admin-insights.js'),'utf8'),clock);
+assert.equal(clock.window.gambAdminTime('2026-11-24T01:47:22+00:00'),'23/11/2026, 22:47:22 · America/Sao_Paulo');
+assert.equal(clock.window.gambAdminTime('2026-11-23 22:47:22'),'23/11/2026 22:47:22 · America/Sao_Paulo');
 // Pequena fixture DOM: verifica contratos dos controles sem acessar servidor ou backups reais.
 function element(tag) {
   return {tag,children:[],dataset:{},attributes:{},listeners:{},textContent:'',title:'',
