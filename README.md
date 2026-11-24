@@ -4,7 +4,13 @@
 
 Extensão para WordPress destinada à geração de sites estáticos, à publicação em diretório local ou arquivo ZIP e à redução da exposição de informações técnicas na saída pública.
 
-**Versão de referência:** 5.2.0. **Licença:** GPL-2.0-or-later. **Manutenção:** [gamberine](https://github.com/gamberine).
+**Versão de referência:** 5.4.0. **Licença:** GPL-2.0-or-later. **Manutenção:** [gamberine](https://github.com/gamberine).
+
+## Manual de uso
+
+A fonte oficial do [manual interativo](assets/docs/manual.html) fica neste repositório e acompanha o pacote do plugin. Na instalação, acesse `ajuda/publicacao-estatica/`, relativa à URL principal do site, ou o botão **Manual** do painel.
+
+O manual deve ser atualizado junto de cada alteração de função, campo, menu ou fluxo, conforme `AGENTS.md`. A exportação completa distribui a mesma fonte, com o tratamento de URLs do destino. Para uma publicação estática independente, republicar também atualiza sua cópia do manual. O arquivo `docs/manual-detalhado.html` é uma referência histórica, não uma segunda fonte editorial.
 
 ## Finalidade e limites
 
@@ -44,7 +50,7 @@ Endereços opacos não constituem controle de acesso. Arquivos publicados perman
 
 O pacote contém uma única pasta `gamb-wp-static-guard`. Não inclui banco de dados, credenciais, uploads ou tema de qualquer instalação.
 
-A primeira instalação da versão 5 utiliza o ZIP. As releases subsequentes aparecem nos controles de atualização do WordPress. O painel **Atualizações e auditoria** permite verificar novas versões e revalidar a origem. O WordPress controla a instalação e a habilitação das atualizações automáticas.
+A primeira instalação da versão 5 utiliza o ZIP. As releases subsequentes aparecem nos controles de atualização do WordPress. **Atualizações do plugin** permite verificar novas versões; **Análises e auditoria** reúne as verificações da origem e da publicação. O WordPress controla a instalação e a habilitação das atualizações automáticas.
 
 O repositório padrão é `gamberine/gamb-wp-static-guard`, configurável no painel ou por `GAMB_GITHUB_REPOSITORY`. Repositórios privados admitem `GAMB_GITHUB_TOKEN` ou token salvo com AES-256-GCM. O valor não é devolvido à interface. Alteração dos salts exige cadastrar novamente o token criptografado.
 

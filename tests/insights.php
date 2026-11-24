@@ -31,7 +31,9 @@ try {
     $options->set('delivery_method','zip');expect(!Insights::publication()['inventory_available'],'Não atribuir inventário local ao pacote ZIP.');
     $controller=file_get_contents(dirname(__DIR__).'/src/class-gamb-admin.php');preg_match_all('/data-opt="([a-z_]+)"/',$controller,$fields);$help=Insights::help();foreach($fields[1]as$key){expect(isset($help[$key]),'Ajuda disponível para campo '.$key);}
     $manual=file_get_contents(dirname(__DIR__).'/assets/docs/manual.html');expect(!Evidence::inspect($manual,false,true),'Manual público passa pelos controles do HTML final.');
-    expect(!preg_match('~(?:localhost|[A-Z]:[\\\\/]|_wpnonce|data-opt=|restUrl)~i',$manual),'Manual sem dados operacionais ou acesso às configurações.');
+    $private_reference='~(?:localhost|(?<![A-Za-z0-9])[A-Z]:[\\\\/]|_wpnonce|data-opt=|restUrl)~i';
+    expect(!preg_match($private_reference,$manual),'Manual sem dados operacionais ou acesso às configurações.');
+    expect(preg_match($private_reference,'C:/private/file')&&!preg_match($private_reference,'https://github.com/example/docs'),'Distinguir caminho de disco e URL HTTPS pública.');
 }finally{
     $GLOBALS['fixture_options']=$baseline;foreach($config as$key=>$value){$options->set($key,$value);}
     foreach(array('/publication/pagina/index.html','/publication/index.html','/publication/.gamb-static-files.json','/application/.env')as$file){if(is_file($sandbox.$file))unlink($sandbox.$file);}
