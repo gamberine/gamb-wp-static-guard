@@ -11,7 +11,7 @@ class Operation_Progress {
     private static $current = null;
     private static $last_write = 0.0;
     private static $last_control_read = 0.0;
-    const LABELS = array('export'=>'Publicação estática', 'single'=>'Publicação do conteúdo', 'settings'=>'Aplicação das configurações', 'diagnostics'=>'Diagnóstico da instalação', 'updates'=>'Consulta de atualizações', 'audit'=>'Auditoria da origem', 'backup'=>'Cópia de segurança', 'backup-delete'=>'Exclusão da cópia de segurança');
+    const LABELS = array('export'=>'Publicação estática', 'single'=>'Publicação do conteúdo', 'settings'=>'Aplicação das configurações', 'diagnostics'=>'Diagnóstico da instalação', 'updates'=>'Consulta de atualizações', 'audit'=>'Auditoria da origem', 'publication-audit'=>'Auditoria da publicação', 'destination'=>'Verificação do destino', 'backup'=>'Cópia de segurança', 'backup-delete'=>'Exclusão da cópia de segurança');
 
     private static function lock() {
         $handle = @fopen(get_temp_dir() . 'gamb-operation-' . md5(ABSPATH) . '.lock', 'c');
@@ -136,11 +136,11 @@ class Operation_Progress {
             $result=$callback(); $data=$result instanceof \WP_REST_Response ? $result->get_data() : $result;
             if (is_wp_error($result) || ($result instanceof \WP_REST_Response && $result->get_status() >= 400) || (is_array($data) && isset($data['success']) && !$data['success'])) {
                 self::finish('error', is_wp_error($result) ? $result->get_error_message() : ($data['message'] ?? 'A operação não foi concluída.'));
-            } elseif ($kind === 'audit' && empty($data['audit']['success'])) {
+            } elseif (in_array($kind,array('audit','publication-audit'),true) && empty($data['audit']['success'])) {
                 self::finish('error','Auditoria concluída com impedimentos. Consulte os resultados.');
             } else {
                 $message=self::LABELS[$kind] . ': execução concluída.';
-                if (isset($data['files_count'])) { $message.=' ' . (int)$data['files_count'] . ' arquivos processados.'; }
+                if (isset($data['files_count'])) { $message.=' ' . (int)$data['files_count'] . ' unidades processadas.'; }
                 if (isset($data['filename'])) { $message.=' Arquivo: ' . sanitize_file_name($data['filename']) . '.'; }
                 $warning=($kind==='updates' && empty($data['latest'])) || !empty($data['dependency_warnings']) || ($kind === 'diagnostics' && count(array_filter($data['installation']['checks'] ?? array(), static function($c) { return ($c['status'] ?? '') !== 'ok'; })));
                 if ($warning) { $message.=' Há alertas; consulte os resultados.'; }

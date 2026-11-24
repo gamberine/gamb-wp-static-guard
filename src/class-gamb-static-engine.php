@@ -249,6 +249,12 @@ class Static_Engine {
 		$tokens_cnt   = $guard->materialize_cloaked_assets_in_archive( $archive_dir );
 		$exported_cnt += $tokens_cnt;
 		Installation_Checks::finalize_integrity( $archive_dir );
+		if ( 'theme' !== $scope ) {
+			$manual_path = Admin_Insights::MANUAL_PATH . 'index.html';
+			wp_mkdir_p( dirname( $archive_dir . $manual_path ) );
+			$this->write_export_file( $archive_dir . $manual_path, Installation_Checks::finalize_document( Admin_Insights::manual_html(), $manual_path ) );
+			$exported_cnt++;
+		}
 		Gamb_Static_Auditor::audit_directory( $archive_dir );
 
 		// 4. Escreve arquivos de blindagem de servidor (.htaccess e _headers) na raiz da exportação
@@ -276,7 +282,7 @@ class Static_Engine {
 			$opts->set( "last_export_zip_url", $deploy_result["download_url"] );
 			$opts->set( "last_export_zip_file", $deploy_result["filename"] );
 			self::log_activity(
-				sprintf( "Exportação concluída (%s): %d arquivos processados.", $scope_label, $exported_cnt ),
+				sprintf( "Exportação concluída (%s): %d unidades processadas.", $scope_label, $exported_cnt ),
 				array(
 					"url"   => $deploy_result["download_url"],
 					"label" => "Baixar Pacote Estático ZIP (" . $deploy_result["size_formatted"] . ")",
@@ -692,28 +698,7 @@ class Static_Engine {
 	}
 
 	private function validate_local_destination( $path ) {
-		$path = trim( (string) $path );
-		$real = realpath( $path );
-		if ( '' === $path || false === $real || ! is_dir( $real ) || ! is_writable( $real ) ) {
-			return new \WP_Error( 'invalid_local', 'Crie e selecione uma pasta local existente e gravável, dedicada ao site estático.' );
-		}
-		$target = strtolower( trailingslashit( wp_normalize_path( $real ) ) );
-		$wp_root = strtolower( trailingslashit( wp_normalize_path( realpath( ABSPATH ) ) ) );
-		if ( 0 === strpos( $wp_root, $target ) || $target === strtolower( trailingslashit( wp_normalize_path( dirname( $real ) ) ) ) ) {
-			return new \WP_Error( 'unsafe_local', 'O destino não pode ser a raiz do WordPress, uma pasta ancestral ou a raiz do disco.' );
-		}
-		foreach ( array( WP_CONTENT_DIR, ABSPATH . 'wp-admin', ABSPATH . WPINC, ABSPATH . '.codex-artifacts' ) as $protected ) {
-			$protected = strtolower( trailingslashit( wp_normalize_path( $protected ) ) );
-			if ( 0 === strpos( $target, $protected ) ) {
-				return new \WP_Error( 'unsafe_local', 'Escolha uma pasta de publicação fora dos diretórios internos do WordPress.' );
-			}
-		}
-		foreach ( array( 'wp-config.php', 'wp-load.php', '.git', '.env' ) as $marker ) {
-			if ( file_exists( trailingslashit( $real ) . $marker ) ) {
-				return new \WP_Error( 'unsafe_local', 'O destino contém arquivos de uma aplicação; escolha uma pasta dedicada.' );
-			}
-		}
-		return $real;
+		return Publication_Destination::validate( $path );
 	}
 
 	/** Remove only stale files recorded by this plugin; preserve unrelated files. */

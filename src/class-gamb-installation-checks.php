@@ -192,7 +192,7 @@ class Installation_Checks {
     }
 
     public function dependency_report() {
-        return array( 'dependencies' => array_values( $this->dependencies ), 'external_navigation_count' => count( $this->navigation ), 'local_stylesheets_checked' => count( $this->visited_css ), 'limited' => $this->limited, 'scope' => 'HTML e CSS local; requisições montadas em JavaScript exigem conferência no navegador.' );
+        return array( 'version'=>GAMB_STATIC_WP_VERSION,'checked_at'=>gmdate('c'),'dependencies' => array_values( $this->dependencies ), 'external_navigation_count' => count( $this->navigation ), 'external_navigation'=>array_keys($this->navigation), 'navigation_limit'=>200, 'local_stylesheets_checked' => count( $this->visited_css ), 'limited' => $this->limited, 'scope' => 'HTML e CSS local; requisições montadas em JavaScript exigem conferência no navegador.' );
     }
 
     /** O hash considera os bytes finais, depois da reescrita de URLs e dos comentários. */

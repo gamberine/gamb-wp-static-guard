@@ -46,8 +46,9 @@ class Admin_Controller
             return;
         }
         wp_enqueue_style('gamb-guard-admin', GAMB_STATIC_WP_URL . '/assets/admin-ui.css', array('gamb-guard-menu'), $this->asset_version('admin-ui.css'));
-        wp_enqueue_script('gamb-guard-admin', GAMB_STATIC_WP_URL . '/assets/admin-ui.js', array(), $this->asset_version('admin-ui.js'), true);
-        wp_localize_script('gamb-guard-admin', 'gambGuardData', array('restUrl' => rest_url(self::API . '/'), 'nonce' => wp_create_nonce('wp_rest')));
+        wp_enqueue_script('gamb-guard-insights', GAMB_STATIC_WP_URL . '/assets/admin-insights.js', array(), $this->asset_version('admin-insights.js'), true);
+        wp_enqueue_script('gamb-guard-admin', GAMB_STATIC_WP_URL . '/assets/admin-ui.js', array('gamb-guard-insights'), $this->asset_version('admin-ui.js'), true);
+        wp_localize_script('gamb-guard-admin', 'gambGuardData', array('restUrl' => rest_url(self::API . '/'), 'nonce' => wp_create_nonce('wp_rest'),'timezone'=>function_exists('wp_timezone_string')?wp_timezone_string():'UTC','fieldHelp'=>Admin_Insights::help(),'suggestedDirectory'=>wp_normalize_path(ABSPATH.'link-publico')));
     }
     public function register_admin_bar_node($bar)
     {
@@ -108,6 +109,14 @@ class Admin_Controller
             '/security-status' => array('methods' => 'GET', 'callback' => array($this, 'rest_security_status')),
             '/check-updates' => array('methods' => 'POST', 'callback' => array($this, 'rest_check_updates')),
             '/audit' => array('methods' => 'POST', 'callback' => array($this, 'rest_audit')),
+            '/insights' => array('methods'=>'GET','callback'=>static function($request){return rest_ensure_response(Admin_Insights::snapshot(max(1,absint($request->get_param('page')))));}),
+            '/destination' => array('methods'=>'POST','callback'=>static function($request){$result=Publication_Destination::inspect($request->get_param('path'),filter_var($request->get_param('create'),FILTER_VALIDATE_BOOLEAN));if(is_wp_error($result))return new \WP_Error($result->get_error_code(),$result->get_error_message(),array('status'=>400));return rest_ensure_response($result);}),
+            '/publication-audit' => array('methods'=>'POST','callback'=>static function(){
+                if (Options::instance()->get('delivery_method')!=='local') { return new \WP_Error('local_delivery_required','A auditoria do destino requer uma entrega local. Para ZIP, confira o pacote e o servidor de destino.',array('status'=>400)); }
+                $directory=Publication_Destination::validate(Options::instance()->get('local_dir',''));if(is_wp_error($directory)){return $directory;}
+                try {$report=Gamb_Static_Auditor::audit_directory($directory,'delivered');}catch(\Throwable $error){Gamb_Static_Auditor::processing_failure();$report=get_option(Gamb_Static_Auditor::PUBLICATION_OPTION,array());}
+                return rest_ensure_response(array('audit'=>$report));
+            }),
             '/apply-single' => array('methods' => 'POST', 'callback' => array($this, 'rest_apply_single')),
             '/backups' => array('methods' => 'GET', 'callback' => static function () {
                 return rest_ensure_response(Backup_Service::list_backups());
@@ -124,7 +133,7 @@ class Admin_Controller
                 }
                 unset($endpoint);
             }
-            $kinds = array('/settings' => 'settings', '/start-export' => 'export', '/apply-single' => 'single', '/diagnostics' => 'diagnostics', '/check-updates' => 'updates', '/audit' => 'audit', '/backup' => 'backup', '/backup/delete' => 'backup-delete');
+            $kinds = array('/settings' => 'settings', '/start-export' => 'export', '/apply-single' => 'single', '/diagnostics' => 'diagnostics', '/check-updates' => 'updates', '/audit' => 'audit', '/publication-audit'=>'publication-audit','/destination'=>'destination','/backup' => 'backup', '/backup/delete' => 'backup-delete');
             $wrap = static function ($endpoint) use ($route, $kinds) {
                 if (isset($kinds[$route]) && $endpoint['methods'] === 'POST') {
                     $callback = $endpoint['callback'];
@@ -236,6 +245,11 @@ class Admin_Controller
         if (isset($params['delivery_method']) && ! in_array($params['delivery_method'], array('local', 'zip'), true)) {
             return new \WP_Error('invalid_delivery', 'Selecione entrega local ou arquivo ZIP.', array('status' => 400));
         }
+        if (($params['delivery_method']??$options->get('delivery_method'))==='local') {
+            $destination=Publication_Destination::validate($params['local_dir']??$options->get('local_dir',''));
+            if(is_wp_error($destination)){return new \WP_Error('invalid_local',$destination->get_error_message(),array('status'=>400));}
+            $params['local_dir']=$destination;
+        }
         if ('' !== $new_token || $clear_token) {
             Gamb_GitHub_Updater::instance()->clear_cache();
             if (! Gamb_GitHub_Updater::instance()->set_token($clear_token ? '' : $new_token)) {
@@ -311,15 +325,17 @@ class Admin_Controller
     public static function section_badges(): array
     {
         $installation = (array) Installation_Checks::latest();
-        $audit = (array) get_option(Gamb_Static_Auditor::REPORT_OPTION, array());
+        $audit = (array) get_option(Gamb_Static_Auditor::PUBLICATION_OPTION, get_option(Gamb_Static_Auditor::REPORT_OPTION, array()));
         $checks = array_values(array_filter((array) ($installation['checks'] ?? array()), 'is_array'));
         $badge = static function (string $state, string $label, string $tone, string $message): array {
             return compact('state', 'label', 'tone', 'message');
         };
         $assess = static function (array $items) use ($installation, $badge): array {
             $statuses = array_column($items, 'status');
+            $reasons=array_values(array_filter(array_map(static fn($check)=>($check['status']??'')!=='ok'?(string)($check['message']??''): '',$items)));
+            $reason=$reasons?' '.implode(' ',array_slice($reasons,0,2)):'';
             if (in_array('error', $statuses, true)) {
-                return $badge('error', 'Impedimento', 'error', 'O diagnóstico registrou impedimentos. Consulte os detalhes da instalação.');
+                return $badge('error', 'Impedimento', 'error', 'O diagnóstico registrou impedimentos.'.$reason.' Consulte Análises e auditoria.');
             }
             if (empty($installation['checked_at']) || empty($items)) {
                 return $badge('unknown', 'Não verificado', 'neutral', 'Execute o diagnóstico da instalação.');
@@ -328,7 +344,7 @@ class Admin_Controller
                 return $badge('stale', 'Revalidar', 'warning', 'O diagnóstico pertence a outra versão do plugin. Execute a verificação novamente.');
             }
             if (count($statuses) !== count($items) || array_diff($statuses, array('ok'))) {
-                return $badge('warning', 'Atenção', 'warning', 'O diagnóstico registrou alertas. Consulte os detalhes da instalação.');
+                return $badge('warning', 'Atenção', 'warning', 'O diagnóstico registrou alertas.'.$reason.' Consulte Análises e auditoria.');
             }
             return $badge('ok', 'Verificado', 'success', 'Nenhum impedimento ou alerta no diagnóstico registrado.');
         };
@@ -370,6 +386,7 @@ class Admin_Controller
         $diagnostics = Installation_Checks::latest();
         $publication = Publication_Status::snapshot();
         $sections = self::section_badges();
+        try { $public_url=Static_Engine::get_instance()->public_base_url(); } catch (\Throwable $error) { $public_url=''; }
         $publication_resources = get_option(Installation_Checks::EXPORT_OPTION, array());
         $resources = ! empty($publication_resources) ? $publication_resources : ($diagnostics['resources'] ?? array());
 ?>
@@ -379,14 +396,15 @@ class Admin_Controller
                     <img src="<?php echo esc_url(GAMB_STATIC_WP_URL . '/assets/gamb-wp-static-guard-logo.svg'); ?>" alt="Gamb WP Static Guard" width="420" height="100">
                 </div>
                 <div class="gamb-admin-header-info">
-                    <p>Administração de publicação estática e controles de exposição - Versão <?php echo esc_html(GAMB_STATIC_WP_VERSION); ?></p>
+                    <p>Administração de publicação estática e controles de exposição - Versão <?php echo esc_html(GAMB_STATIC_WP_VERSION); ?> · Horários: <?php echo esc_html(function_exists('wp_timezone_string')?wp_timezone_string():'UTC'); ?></p>
                     <a class="button gamb-releases-link" href="https://github.com/gamberine/gamb-wp-static-guard/releases/latest" target="_blank" rel="noopener noreferrer">Releases no GitHub <span aria-hidden="true">↗</span></a>
                 </div>
             </header>
             <div id="gamb-toast" class="gamb-process" role="status" aria-live="polite" aria-atomic="true" hidden>
-                <div class="gamb-process-heading"><strong data-process-label></strong><span data-process-percent></span></div>
+                <div class="gamb-process-heading"><strong data-process-label></strong><span data-process-percent></span><nav class="gamb-quick-links" aria-label="Acessos rápidos"><a data-publication-link href="<?php echo esc_url($public_url); ?>" target="_blank" rel="noopener noreferrer" <?php if (!$public_url) echo 'hidden'; ?>>Abrir publicação ↗</a><a href="<?php echo esc_url(Admin_Insights::manual_url()); ?>" target="_blank" rel="noopener noreferrer">Manual ↗</a></nav></div>
                 <div class="gamb-progress-track" role="progressbar" aria-label="Progresso das etapas" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span data-process-bar></span></div>
                 <div class="gamb-process-detail"><div class="gamb-process-summary"><p data-process-message></p><small data-process-units></small></div><div class="gamb-process-actions" hidden><button type="button" class="button gamb-process-stop" data-process-stop disabled>Parar</button><button type="button" class="button button-primary" data-process-resume hidden>Continuar</button></div></div>
+                <button type="button" class="gamb-static-problem" data-static-problem data-open-panel="analysis" hidden></button>
             </div>
             <div class="gamb-layout">
                 <aside class="gamb-sidebar" aria-label="Publicação e segurança">
@@ -399,8 +417,6 @@ class Admin_Controller
                             <button type="button" class="button" data-tab="conversion" aria-controls="panel-conversion" aria-pressed="false">Conteúdo e conversão</button>
                             <button type="button" class="button" data-tab="automation" aria-controls="panel-automation" aria-pressed="false">Automação e notificações</button>
                             <button type="button" class="button" data-tab="performance" aria-controls="panel-performance" aria-pressed="false">Integridade e desempenho</button>
-                            <button type="button" class="button" data-tab="diagnostics" aria-controls="panel-diagnostics" aria-pressed="false">Diagnóstico da instalação</button>
-                            <button type="button" class="button" data-tab="dependencies" aria-controls="panel-dependencies" aria-pressed="false">Dependências externas</button>
                         </nav>
                     </details>
                     <details class="gamb-sidebox" name="gamb-sections">
@@ -408,14 +424,22 @@ class Admin_Controller
                         <nav class="gamb-admin-nav" aria-label="Controles de segurança">
                             <button type="button" class="button" data-tab="guard" aria-controls="panel-guard" aria-pressed="false">Controles de exposição</button>
                             <button type="button" class="button" data-tab="updates" aria-controls="panel-updates" aria-pressed="false">Atualizações do plugin</button>
-                            <button type="button" class="button" data-tab="audit" aria-controls="panel-audit" aria-pressed="false">Auditoria da publicação</button>
+                            <button type="button" class="button" data-tab="audit" aria-controls="panel-audit" aria-pressed="false">Configuração da auditoria</button>
                             <button type="button" class="button" data-tab="monitor" aria-controls="panel-monitor" aria-pressed="false">Monitor da versão WP</button>
                             <button type="button" class="button" data-tab="monitor-query" aria-controls="panel-monitor-query" aria-pressed="false">Consultas do monitor</button>
                             <button type="button" class="button" data-tab="backup" aria-controls="panel-backup" aria-pressed="false">Gerenciador de backups</button>
                         </nav>
                     </details>
+                    <details class="gamb-sidebox gamb-analysis-box" name="gamb-sections">
+                        <summary><span>3. Análises e auditoria</span></summary>
+                        <nav class="gamb-admin-nav" aria-label="Análises e auditoria">
+                            <?php foreach (array('analysis'=>'Resumo e pendências','publication-audit'=>'Auditoria da publicação','origin-audit'=>'Auditoria da origem','diagnostics'=>'Diagnóstico da instalação','dependencies'=>'Dependências externas','files'=>'Arquivos publicados') as $tab=>$label) : ?>
+                            <button type="button" class="button" data-tab="<?php echo esc_attr($tab); ?>" aria-controls="panel-<?php echo esc_attr($tab); ?>" aria-pressed="false"><?php echo esc_html($label); ?></button>
+                            <?php endforeach; ?>
+                        </nav>
+                    </details>
                     <details class="gamb-sidebox gamb-scope-box" name="gamb-sections">
-                        <summary id="gamb-scope-heading"><span>3. Escopo da Conversão</span><span class="gamb-badge" data-publication-badge data-tone="<?php echo esc_attr($publication['tone']); ?>"><?php echo esc_html($publication['label']); ?></span></summary>
+                        <summary id="gamb-scope-heading"><span>4. Escopo da Conversão</span><span class="gamb-badge" data-publication-badge data-tone="<?php echo esc_attr($publication['tone']); ?>"><?php echo esc_html($publication['label']); ?></span></summary>
                         <div class="gamb-scope-content">
                             <p data-publication-message><?php echo esc_html($publication['message']); ?></p>
                             <label class="screen-reader-text" for="gamb-quick-scope">Escopo de conversão</label>
@@ -444,10 +468,13 @@ class Admin_Controller
                                 <dd id="stat-last-scope"><?php echo esc_html($options['last_export_scope'] ?: 'Não registrado'); ?></dd>
                             </div>
                             <div>
-                                <dt>Arquivos processados</dt>
+                                <dt>Unidades processadas</dt>
                                 <dd id="stat-last-count"><?php echo (int) $options['last_export_files_count']; ?></dd>
                             </div>
                         </dl>
+                        <p>As unidades representam etapas de processamento. Um mesmo recurso pode gerar mais de um arquivo físico.</p>
+                        <p class="gamb-destination-summary" data-publication-location></p>
+                        <div class="gamb-action-row"><button type="button" class="button" data-open-panel="files">Ver arquivos e localização</button><button type="button" class="button button-primary" data-open-panel="publication-audit">Ver auditoria da publicação</button><button type="button" class="button" data-open-panel="analysis">Entender alertas</button></div>
                         <div id="gamb-latest-zip-wrap"></div>
                     </section>
                     <section class="gamb-panel" id="panel-activity" hidden>
@@ -456,19 +483,26 @@ class Admin_Controller
                     </section>
                     <section class="gamb-panel" id="panel-diagnostics" hidden aria-labelledby="gamb-diagnostics-heading">
                         <h2 id="gamb-diagnostics-heading">Diagnóstico da instalação</h2>
-                        <p>A primeira consulta é executada ao abrir este painel após instalar ou atualizar o plugin. As publicações completas inspecionam as páginas e folhas de estilo locais processadas.</p>
+                        <p>Verifica recursos do PHP, páginas da origem, modelo 404 e condições necessárias à conversão. Alertas não equivalem necessariamente a bloqueios.</p>
                         <p>Verificação da origem: <span data-diagnostics-time><?php echo esc_html($diagnostics['checked_at'] ?? 'Não realizada'); ?></span></p>
                         <button type="button" class="button" data-run-diagnostics>Verificar novamente</button>
                         <ul data-installation-checks><?php foreach ((array) ($diagnostics['checks'] ?? array()) as $check) : ?><li><strong><?php echo esc_html(array('ok' => 'Verificado', 'warning' => 'Atenção', 'error' => 'Impedimento')[$check['status']] ?? 'Informação'); ?>:</strong> <?php echo esc_html($check['message']); ?></li><?php endforeach; ?></ul>
                     </section>
                     <section class="gamb-panel" id="panel-dependencies" hidden>
-                        <h3>Dependências externas</h3>
+                        <h2>Dependências externas</h2>
                         <p>Recursos de renderização e serviços externos exigem avaliação de versão, compatibilidade e licença antes da internalização. Links de navegação não são copiados. Nenhum arquivo do tema é alterado por este diagnóstico.</p>
                         <p data-dependency-summary><?php echo esc_html(count($resources['dependencies'] ?? array()) . ' dependência(s); ' . ($resources['external_navigation_count'] ?? 0) . ' link(s) externo(s) de navegação. ' . (! empty($resources['limited']) ? 'Limite de inspeção atingido. ' : '') . ($resources['scope'] ?? '')); ?></p>
+                        <dl class="gamb-stats"><div><dt>Recursos externos encontrados</dt><dd data-dependency-count>—</dd></div><div><dt>Links de navegação</dt><dd data-navigation-count>—</dd></div><div><dt>Estado da inspeção</dt><dd data-dependency-state>—</dd></div></dl>
+                        <div class="gamb-callout"><strong>Como interpretar</strong><p>Zero recursos encontrados vale apenas para o HTML e CSS inspecionados. Chamadas criadas por JavaScript, serviços, formulários e carregamentos tardios precisam ser conferidos na aba Rede do navegador. Links para outros sites são navegação e permanecem externos.</p></div>
+                        <h3>Recursos que participam da renderização</h3>
                         <ul data-dependency-list><?php foreach ((array) ($resources['dependencies'] ?? array()) as $dependency) : ?><li><?php echo esc_html($dependency['kind'] . ': ' . $dependency['url']); ?></li><?php endforeach; ?></ul>
+                        <details><summary>Links externos de navegação</summary><ul data-navigation-list></ul></details>
+                        <h3>Como proceder</h3><ol><li>Identifique o recurso, o responsável e a necessidade para o portal.</li><li>Antes de internalizar, confira licença, versão e compatibilidade. Este diagnóstico não copia bibliotecas.</li><li>Valide o site no navegador e refaça a publicação após corrigir a origem.</li></ol>
+                        <a class="button" data-report-download="summary">Baixar relatório completo (JSON)</a>
                     </section>
                     <section class="gamb-panel" id="panel-settings" hidden>
                         <h2>Destino e endereços</h2>
+                        <div class="gamb-callout"><strong>Endereço público salvo</strong><p><a data-publication-url href="<?php echo esc_url($public_url); ?>" target="_blank" rel="noopener noreferrer"><?php echo esc_html($public_url ?: 'Configure o domínio público do destino.'); ?></a></p><p data-proposed-url></p><small>A pasta física e a URL são configurações distintas. O servidor precisa apontar esse endereço para a pasta escolhida; criar a pasta não configura DNS, certificado ou host virtual.</small></div>
                         <div class="gamb-form-grid">
                         <div>
                         <label class="gamb-field" for="gamb-delivery">Forma de entrega</label><select id="gamb-delivery" data-opt="delivery_method">
@@ -476,7 +510,7 @@ class Admin_Controller
                             <option value="zip" <?php selected($options['delivery_method'], 'zip'); ?>>Arquivo ZIP</option>
                         </select>
                         </div>
-                        <div><?php $this->input('local_dir', 'Diretório local dedicado à publicação', $options); ?></div>
+                        <div><?php $this->input('local_dir', 'Diretório local dedicado à publicação', $options); ?><div class="gamb-action-row"><button type="button" class="button" data-destination-suggest>Usar sugestão</button><button type="button" class="button" data-destination-check>Verificar pasta</button><button type="button" class="button" data-destination-create hidden disabled>Criar pasta</button></div><p data-destination-result role="status" aria-live="polite">Verifique a pasta antes de salvar. A criação só ocorre ao clicar em Criar pasta.</p></div>
                         <div>
                         <label class="gamb-field" for="gamb-url-type">Formato dos endereços</label><select id="gamb-url-type" data-opt="destination_url_type">
                             <option value="relative" <?php selected($options['destination_url_type'], 'relative'); ?>>Relativo ao domínio</option>
@@ -579,14 +613,33 @@ class Admin_Controller
                         <button type="button" class="button button-primary gamb-save-settings-btn">Salvar configurações</button>
                     </section>
                     <section class="gamb-panel" id="panel-audit" hidden>
-                        <h2>Auditoria da publicação</h2>
+                        <h2>Configuração da auditoria</h2>
+                        <p>Defina as exceções necessárias ao tema e os shortcodes que precisam estar renderizados. Os resultados ficam em Análises e auditoria.</p>
                         <?php $this->input('sanitizer_style_whitelist', 'IDs de estilos nativos preservados, separados por espaços', $options);
                         $this->input('audit_unresolved_shortcodes', 'Shortcodes não resolvidos que devem bloquear a publicação, sem colchetes', $options); ?>
                         <button type="button" class="button button-primary gamb-save-settings-btn">Salvar configurações</button>
                         <p>O gate examina o buffer original e o HTML final. Um impedimento CRITICAL interrompe a entrega e preserva a publicação existente.</p>
-                        <button type="button" class="button" data-run-audit>Revalidar origem agora</button>
-                        <p data-audit-status role="status" aria-live="polite">Consulte o relatório para verificar a última execução.</p>
-                        <ul data-audit-findings></ul>
+                        <button type="button" class="button" data-open-panel="publication-audit">Abrir resultados da publicação</button>
+                    </section>
+                    <section class="gamb-panel" id="panel-analysis" hidden>
+                        <h2>Análises e auditoria</h2><p>Consulte as causas dos alertas, a cobertura de cada verificação e as providências recomendadas. Os relatórios desta área são administrativos e podem conter a estrutura da publicação.</p>
+                        <div class="gamb-callout"><strong>Auditoria da publicação</strong><p data-analysis-audit>Carregando evidências registradas.</p><button type="button" class="button button-primary" data-open-panel="publication-audit">Abrir relatório detalhado</button></div>
+                        <h3>Pendências e causas do status STATIC</h3><ul data-analysis-alerts></ul>
+                        <div class="gamb-action-row"><button type="button" class="button" data-open-panel="diagnostics">Diagnóstico da instalação</button><button type="button" class="button" data-open-panel="dependencies">Avaliar dependências</button><a class="button" data-report-download="summary">Baixar todas as evidências (JSON)</a></div>
+                    </section>
+                    <section class="gamb-panel" id="panel-publication-audit" hidden>
+                        <h2>Auditoria da publicação</h2><p>Durante a exportação, o gate examina o buffer original e o HTML final antes da entrega. A verificação abaixo lê os documentos HTML presentes na pasta local salva, sem alterá-los. Ela interrompe a inspeção no primeiro impedimento crítico; documentos restantes ficam sem certificação.</p>
+                        <div class="gamb-action-row"><button type="button" class="button button-primary" data-run-publication-audit>Auditar arquivos publicados</button><a class="button" data-report-download="publication">Baixar auditoria (JSON)</a></div><div data-audit-report="publication" aria-live="polite"></div>
+                    </section>
+                    <section class="gamb-panel" id="panel-origin-audit" hidden>
+                        <h2>Auditoria da origem</h2><p>Revalida a captura da Home e de uma página inexistente da origem. Não substitui a auditoria dos arquivos entregues nem verifica todas as páginas do site.</p>
+                        <div class="gamb-action-row"><button type="button" class="button button-primary" data-run-audit>Revalidar origem agora</button><a class="button" data-report-download="origin">Baixar auditoria (JSON)</a></div><div data-audit-report="origin" aria-live="polite"></div>
+                    </section>
+                    <section class="gamb-panel" id="panel-files" hidden>
+                        <h2>Arquivos publicados</h2><p data-inventory-summary>Carregando inventário da entrega local.</p><p class="gamb-destination-summary" data-inventory-location></p>
+                        <div class="gamb-action-row"><label for="gamb-file-search">Filtrar esta página</label><input type="search" id="gamb-file-search" placeholder="Nome ou caminho do arquivo"><a class="button" data-report-download="files">Baixar inventário completo (JSON)</a></div>
+                        <div class="gamb-table-wrap" tabindex="0" role="region" aria-label="Inventário dos arquivos"><table class="widefat striped"><thead><tr><th scope="col">Arquivo relativo à pasta</th><th scope="col">Tamanho</th><th scope="col">Disponibilidade</th></tr></thead><tbody data-inventory-files></tbody></table></div>
+                        <div class="gamb-action-row"><button type="button" class="button" data-files-prev>Anterior</button><span data-files-page></span><button type="button" class="button" data-files-next>Próxima</button></div>
                     </section>
                 </div>
             </div>

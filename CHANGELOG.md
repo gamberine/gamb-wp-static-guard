@@ -2,6 +2,17 @@
 
 Este documento distingue a incorporação histórica das novas alterações. As datas correspondem ao registro verificável, sem reconstruir datas de commits inexistentes.
 
+## 5.3.0 - 2026-11-24
+
+- Separar configurações e evidências em Análises e auditoria, com relatórios independentes da origem e publicação, controles executados, documentos, correções e downloads administrativos protegidos.
+- Explicar os alertas STATIC e distinguir unidades processadas do inventário físico, com localização, paginação e links públicos permitidos.
+- Destacar dependências e navegação externa, limites de inspeção e providências; acrescentar ajuda e exemplos aos campos.
+- Verificar e criar explicitamente pastas dedicadas, reutilizando a validação da entrega e bloqueando caminhos protegidos, atalhos e marcadores de aplicação.
+- Disponibilizar endereço público persistente e manual simplificado, sem dados operacionais, na origem e na exportação.
+- Exibir as datas dos relatórios no fuso configurado no WordPress, identificado na interface; preservar timestamps ISO nos dados.
+- Incluir correções de canonical absoluta, reescrita de origem, preview/noindex, SRI final, CORS e MIME de anexos, mantendo tokens e tratamento dos recursos.
+- Incluir pausa/continuação cooperativa da mesma sincronização, cabeçalho de progresso compacto e área fixa com rolagem interna responsiva.
+
 ## 5.2.0 - 2026-11-23
 
 - Substituir os rótulos fixos de STATIC e GUARD por estados derivados do diagnóstico e da auditoria, com tratamento de impedimentos, alertas, ausência de verificação e revalidação pendente.

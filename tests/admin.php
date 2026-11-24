@@ -30,6 +30,7 @@ $audit=$approved; $audit['version']='0.0.0'; $cases[]=array('Auditoria de outra 
 $audit=$approved; $audit['documents']=0; $cases[]=array('Não aprovar zero documentos',$good,$audit,false,'success','neutral');
 try {
     foreach ($cases as [$name,$installation,$audit,$pending,$static_tone,$guard_tone]) {
+        unset($GLOBALS['fixture_options'][Audit::PUBLICATION_OPTION]);
         $GLOBALS['fixture_options'][Installation::REPORT_OPTION]=$installation;
         $GLOBALS['fixture_options'][Audit::REPORT_OPTION]=$audit;
         $GLOBALS['fixture_options'][Audit::PENDING_OPTION]=$pending;
