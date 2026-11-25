@@ -2,6 +2,11 @@
 
 Este documento distingue a incorporação histórica das novas alterações. As datas correspondem ao registro verificável, sem reconstruir datas de commits inexistentes.
 
+## 5.4.1 - 2026-11-25
+
+- Usar o PclZip do WordPress com zlib para o backup de banco, tema e extensões quando a extensão ZIP do PHP estiver indisponível.
+- Atualizar o diagnóstico para indicar o suporte ao backup completo. O backup apenas do banco continua disponível em SQL sem ZIP nativo.
+
 ## 5.4.0 - 2026-11-24
 
 - Adicionar a aba Auditoria com verificações defensivas de leitura da última entrega local e de até quatro URLs derivadas do destino salvo, sem redirecionamentos ou entrada de URLs arbitrárias.
