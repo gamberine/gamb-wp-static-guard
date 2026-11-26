@@ -43,7 +43,7 @@
       var get=function(key){return root.querySelector('[data-opt="'+key+'"]').value;};
       var host=hostField.value.trim(), trim=function(value){return value.replace(/^\/+|\/+$/g,'');};
       var savedBox=root.querySelector('[data-saved-address]');
-      var savedUrl=savedBox.querySelector('a').textContent.trim();
+      var savedUrl=root.querySelector('[data-public-url]')?root.querySelector('[data-public-url]').defaultValue:savedBox.querySelector('a').textContent.trim();
       var url, invalid;
       try{
         var rawHost=host.split('/')[0];
@@ -51,8 +51,7 @@
         var name=target.hostname.toLowerCase().replace(/\.$/,'');
         var projectHost=project.hostname.toLowerCase().replace(/\.$/,'');
         var local=/^(localhost|\[::1\]|127\.\d+\.\d+\.\d+)$|\.(?:localhost|local|test)$/.test(name);
-        scheme.querySelector('[value="http://"]').disabled=!local;
-        if(!local)scheme.value='https://';
+        if(!local && !/^(?:10\.|192\.168\.|172\.(?:1[6-9]|2\d|3[01])\.)/.test(name) && scheme.value==='http://')throw Error('Use HTTPS para o destino público.');
         var homePath=trim(project.pathname), hostPath=trim(host.slice(rawHost.length));
         var relative=trim(get('relative_path'));
         if(!host&&!relative&&get('delivery_method')==='local')relative=encodeURIComponent(trim(path.value.replace(/\\/g,'/')).split('/').pop());
@@ -71,7 +70,10 @@
     ['destination_host','relative_path','destination_scheme','delivery_method','local_dir'].forEach(function(key){root.querySelector('[data-opt="'+key+'"]').addEventListener('input',proposed);});
     proposed();
     function invalidate(){create.hidden=true;create.disabled=true;put('[data-destination-result]','Caminho alterado. Verifique a pasta antes de salvar.');}
-    root.querySelector('[data-use-project-url]').addEventListener('click',function(){var u=new URL(this.dataset.projectUrl);root.querySelector('[data-opt=destination_host]').value=u.host;root.querySelector('[data-opt=destination_scheme]').value=u.protocol+'//';root.querySelector('[data-opt=relative_path]').value=u.pathname.replace(/^\/+|\/+$/g,'');root.querySelector('[data-opt=destination_url_type]').value='relative';proposed();});
+    var publicInput=root.querySelector('[data-public-url]');
+    function applyPublicUrl(){if(!publicInput)return;try{var u=new URL(publicInput.value);if(!['http:','https:'].includes(u.protocol)||u.username||u.password||u.search||u.hash)throw Error('Informe uma URL HTTP/HTTPS completa, sem credenciais ou parâmetros.');publicInput.setCustomValidity('');hostField.value=u.host;scheme.value=u.protocol+'//';root.querySelector('[data-opt=relative_path]').value=u.pathname.replace(/^\/+|\/+$/g,'');proposed();}catch(error){publicInput.setCustomValidity(error.message);}}
+    if(publicInput)publicInput.addEventListener('input',applyPublicUrl);
+    root.querySelector('[data-use-project-url]').addEventListener('click',function(){var u=new URL(this.dataset.projectUrl);if(publicInput)publicInput.value=u.href;root.querySelector('[data-opt=destination_host]').value=u.host;root.querySelector('[data-opt=destination_scheme]').value=u.protocol+'//';root.querySelector('[data-opt=relative_path]').value=u.pathname.replace(/^\/+|\/+$/g,'');root.querySelector('[data-opt=destination_url_type]').value='relative';if(publicInput)publicInput.setCustomValidity('');proposed();});
     path.addEventListener('input',invalidate);root.querySelector('[data-destination-suggest]').addEventListener('click',function(){path.value=api.config.suggestedDirectory;invalidate();proposed();});
     function destination(make){var requested=path.value;return api.task('destination','destination',{path:requested,create:make},function(d){if(path.value!==requested)return;path.value=d.path;proposed();put('[data-destination-result]',d.message+' Caminho: '+d.path);create.hidden=!d.can_create;create.disabled=!d.can_create;},function(e){if(path.value===requested){create.hidden=true;create.disabled=true;put('[data-destination-result]','Pasta recusada: '+e.message);}});}
     root.querySelector('[data-destination-check]').addEventListener('click',function(){destination(false);});create.addEventListener('click',function(){destination(true);});
@@ -80,7 +82,7 @@
     root.querySelector('#gamb-file-search').addEventListener('input',function(){if(saved)files(saved.publication);});root.querySelector('[data-files-prev]').addEventListener('click',function(){api.load('Inventário da publicação',function(){return refresh(Math.max(1,page-1));});});root.querySelector('[data-files-next]').addEventListener('click',function(){api.load('Inventário da publicação',function(){return refresh(page+1);});});
     root.querySelectorAll('[data-report-download]').forEach(function(a){a.setAttribute('aria-disabled','true');a.addEventListener('click',function(e){if(!a.hasAttribute('href'))e.preventDefault();});});
     function help(field,key,label){var info=(api.config.fieldHelp||{})[key];if(!info||!label)return;var wrap=node('div',undefined,'gamb-field-heading'),button=node('button','i','gamb-info'),description=node('div',undefined,'gamb-field-help'),id='gamb-help-'+key;if(label.tagName==='LEGEND'){wrap=label;wrap.appendChild(button);}else{label.parentNode.insertBefore(wrap,label);wrap.appendChild(label);wrap.appendChild(button);}button.type='button';button.title='Detalhes e exemplo';button.setAttribute('aria-label','Informações sobre '+label.textContent.trim());button.setAttribute('aria-expanded','false');button.setAttribute('aria-controls',id);description.id=id;description.hidden=true;description.appendChild(node('p',info.description));description.appendChild(node('p','Exemplo: '+info.example));wrap.insertAdjacentElement('afterend',description);if(field)field.setAttribute('aria-describedby',((field.getAttribute('aria-describedby')||'')+' '+id).trim());button.addEventListener('click',function(){description.hidden=!description.hidden;button.setAttribute('aria-expanded',String(!description.hidden));});}
-    root.querySelectorAll('[data-opt]').forEach(function(f){help(f,f.dataset.opt,(f.labels||[])[0]||f.closest('label'));});help(null,'post_types',root.querySelector('#panel-conversion legend'));help(root.querySelector('#gamb-quick-scope'),'generate_type',root.querySelector('label[for=gamb-quick-scope]'));
+    root.querySelectorAll('[data-opt]').forEach(function(f){help(f,f.dataset.opt,(f.labels||[])[0]||f.closest('label'));});help(publicInput,'public_url',root.querySelector('label[for=gamb-public-url]'));help(null,'post_types',root.querySelector('#panel-conversion legend'));help(root.querySelector('#gamb-quick-scope'),'generate_type',root.querySelector('label[for=gamb-quick-scope]'));
     return {refresh:refresh};
   };
 })();

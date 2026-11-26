@@ -515,12 +515,13 @@ class Static_Engine {
 
 	public static function local_public_host( $host ) {
 		$host = strtolower( trim( $host, '[]' ) );
+		if(class_exists(Origin_Context::class)&&Origin_Context::private_host($host))return true;
 		return in_array( $host, array( 'localhost', '::1' ), true ) || str_ends_with( $host, '.localhost' )
 			|| str_ends_with( $host, '.local' ) || str_ends_with( $host, '.test' ) || ( str_starts_with( $host, '127.' ) && filter_var( $host, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4 ) );
 	}
 
 	public static function resolve_public_base( array $settings ) {
-		$home = wp_parse_url( home_url( '/' ) );
+		$home = wp_parse_url( class_exists(Origin_Context::class)?Origin_Context::canonical():home_url( '/' ) );
 		$input = trim( (string) ( $settings['destination_host'] ?? '' ), '/' );
 		if ( preg_match( '~[\\\\\x00-\x20]~', $input ) ) {
 			throw new \RuntimeException( 'Configure um domínio público válido para o destino.' );

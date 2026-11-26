@@ -2,6 +2,15 @@
 
 Este documento distingue a incorporação histórica das novas alterações. As datas correspondem ao registro verificável, sem reconstruir datas de commits inexistentes.
 
+## 5.5.0 - 2026-11-26
+
+- Estático como padrão para novos perfis; URL canônica salva separada das origens temporárias autorizadas.
+- Acesso original privado, desativado por padrão, com confirmação, sessão administrativa, nonce, expiração de uma hora e aviso fixo.
+- Destino e endereços reorganizado em endereço completo, validação privada e entrega; bloqueio de domínio ancestral preservado.
+- Scripts de compartilhamento LAN e cadastro opcional de origem HTTPS sem alterar home/siteurl ou outros projetos.
+- Corrige cabeçalho de cache inválido que causava HTTP 500 no front autenticado.
+- Manual, testes de isolamento de origem e controles de acesso atualizados; correções 5.4.1 incorporadas.
+
 ## 5.4.1 - 2026-11-25
 
 - Restaurar a compatibilidade com PHP 7.4 e incluir essa vers?o na matriz de CI.

@@ -366,7 +366,7 @@ class Gamb_Security_Suite {
 				define( "DONOTCACHEPAGE", true );
 			}
 			if ( ! headers_sent() ) {
-				header( "X-cache de páginas-Cache-Control: private, no-store" );
+				header( "X-LiteSpeed-Cache-Control: private, no-store" );
 				header( "Cache-Control: private, no-store, no-cache, must-revalidate" );
 			}
 		}

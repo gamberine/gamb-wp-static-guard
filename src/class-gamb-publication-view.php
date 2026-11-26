@@ -11,9 +11,10 @@ final class Publication_View {
         if(($settings['public_site_mode']??'wordpress')!=='static')return null;
         if(($settings['delivery_method']??'')!=='local')return 'A apresentação estática na raiz requer entrega local.';
         foreach(array('destination_scheme','destination_host','relative_path')as$key){if(!is_string($settings[$key]??''))return 'Valor de destino invalido.';}
-        $home=Destination_Audit::base(home_url('/'));
+        $home=Destination_Audit::base(class_exists(Origin_Context::class)?Origin_Context::canonical():home_url('/'));
         try { $base = Static_Engine::resolve_public_base($settings); }
         catch (\RuntimeException $error) { return $error->getMessage(); }
+        if(class_exists(Origin_Context::class)&&Origin_Context::parent_domain($home,$base))return 'A instalação em subdomínio não pode apontar para o domínio principal.';
         if(Destination_Audit::base($base)!==$home)return 'Para apresentar o estático na raiz, use a URL principal do projeto como destino. Clique em Usar endereço local do projeto.';
         if(($settings['destination_url_type']??'')==='offline')return 'Use endereços relativos ao domínio ou absolutos para apresentar o estático na raiz.';
         return null;
@@ -27,7 +28,7 @@ final class Publication_View {
         $receipt=$root.'/'.self::RECEIPT;$manifest=$root.'/.gamb-static-files.json';
         if(!is_file($receipt)||is_link($receipt)||filesize($receipt)>16384||!is_file($manifest)||is_link($manifest)||filesize($manifest)>2097152){$result['message']='Modo estático selecionado. Execute uma publicação completa para ativar a entrega na raiz.';return $result;}
         $meta=json_decode((string)file_get_contents($receipt),true);
-        if(!is_array($meta)||($meta['public_url']??'')!==Destination_Audit::base(home_url('/'))||($meta['environment']??'')!==($o['destination_environment']??'production')){$result['message']='A entrega existente pertence a outro destino/ambiente. Reexporte antes de apresentar o estático.';return $result;}
+        if(!is_array($meta)||($meta['public_url']??'')!==Destination_Audit::base(class_exists(Origin_Context::class)?Origin_Context::canonical():home_url('/'))||($meta['environment']??'')!==($o['destination_environment']??'production')){$result['message']='A entrega existente pertence a outro destino/ambiente. Reexporte antes de apresentar o estático.';return $result;}
         $files=json_decode((string)file_get_contents($manifest),true);
         if(!is_array($files)||array_values($files)!==$files||count($files)>20000||!in_array('index.html',$files,true)||!self::resolve($root,'index.html')){$result['message']='Home ou manifesto da entrega indisponível.';return $result;}
         $result['ready']=true;$result['message']='A URL principal apresenta os arquivos estáticos da última entrega. WordPress permanece disponível no admin e na captura assinada.';return $result;
@@ -63,7 +64,8 @@ final class Publication_View {
     }
     public static function serve(): void {
         if(Options::instance()->get('public_site_mode','wordpress')!=='static'||is_admin()||!empty($_GET['rest_route'])||Frontend_Policy::is_export_request()||(defined('DOING_CRON')&&DOING_CRON)||(defined('WP_CLI')&&WP_CLI))return;
-        if(isset($_GET['preview'])&&current_user_can('edit_posts'))return;
+        if(class_exists(Original_Access::class)&&Original_Access::current())return;
+        if(class_exists(Origin_Context::class)&&!Origin_Context::request_home()){self::headers(404,'text/plain');echo 'Endereço indisponível.';exit;}
         $uri=$_SERVER['REQUEST_URI']??'';$homePath=(string)wp_parse_url(home_url('/'),PHP_URL_PATH);
         $relative=substr((string)wp_parse_url($uri,PHP_URL_PATH),strlen(trailingslashit($homePath)));
         if(preg_match('~^(?:wp-admin|wp-json|wp-login\.php|wp-cron\.php|xmlrpc\.php|wp-signup\.php|wp-activate\.php)(?:/|$)~i',$relative))return;
@@ -76,7 +78,7 @@ final class Publication_View {
         $file=in_array($candidate['path'],$manifest,true)?self::resolve($root,$candidate['path']):null;
         self::headers($file?$candidate['status']:404,$file?$candidate['mime']:'text/plain');
         if(($_SERVER['REQUEST_METHOD']??'GET')==='HEAD')exit;
-        if($file){header('Content-Length: '.filesize($file));readfile($file);}else{echo 'Página não encontrada.';}exit;
+        if($file){if(class_exists(Origin_Context::class)&&in_array($candidate['mime'],array('text/html','application/json'),true)){echo Origin_Context::map((string)file_get_contents($file));}else{header('Content-Length: '.filesize($file));readfile($file);}}else{echo 'Página não encontrada.';}exit;
     }
     private static function headers(int $status,string $mime): void {
         while(ob_get_level()>0){if(!@ob_end_clean())break;}
