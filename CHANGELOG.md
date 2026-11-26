@@ -4,6 +4,9 @@ Este documento distingue a incorporação histórica das novas alterações. As 
 
 ## 5.4.1 - 2026-11-25
 
+- Reorganizar o painel de destino, manter a ação de salvar disponível e vincular alertas às abas de diagnóstico e auditoria.
+- Usar a URL da instalação como base do destino padrão, bloquear o domínio pai e impedir caminhos acima da instalação no mesmo host. Exigir HTTPS em destinos externos.
+
 - Usar o PclZip do WordPress com zlib para o backup de banco, tema e extensões quando a extensão ZIP do PHP estiver indisponível.
 - Atualizar o diagnóstico para indicar o suporte ao backup completo. O backup apenas do banco continua disponível em SQL sem ZIP nativo.
 

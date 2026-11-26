@@ -8,6 +8,9 @@ Extensão para WordPress destinada à geração de sites estáticos, à publica�
 
 ## Manual de uso
 
+- [Manual interativo no repositório](https://github.com/gamberine/gamb-wp-static-guard/blob/main/assets/docs/manual.html)
+- [Notas e pacotes da versão](https://github.com/gamberine/gamb-wp-static-guard/releases/tag/v5.4.1)
+
 A fonte oficial do [manual interativo](assets/docs/manual.html) fica neste repositório e acompanha o pacote do plugin. Na instalação, acesse `ajuda/publicacao-estatica/`, relativa à URL principal do site, ou o botão **Manual** do painel.
 
 O manual deve ser atualizado junto de cada alteração de função, campo, menu ou fluxo, conforme `AGENTS.md`. A exportação completa distribui a mesma fonte, com o tratamento de URLs do destino. Para uma publicação estática independente, republicar também atualiza sua cópia do manual. O arquivo `docs/manual-detalhado.html` é uma referência histórica, não uma segunda fonte editorial.

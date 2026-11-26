@@ -39,6 +39,8 @@ https://github.com/gamberine/gamb-wp-static-guard
 == Registro de versões ==
 
 = 5.4.1 =
+* Reorganiza os controles administrativos e abre a aba correspondente a cada alerta.
+* Usa a instalação como base do destino padrão e exige HTTPS para destinos externos.
 Backup de banco, tema e extensões com PclZip do WordPress e zlib quando
 ZIP nativo estiver indisponível. Diagnóstico atualizado.
 
