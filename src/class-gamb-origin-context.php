@@ -6,6 +6,7 @@ if (!defined('ABSPATH')) { exit; }
 /** Origens explícitas da mesma instalação. Nunca confia no Host/Forwarded para cadastrá-las. */
 final class Origin_Context {
     private static $raw = array();
+    private static $state = null;
     public static function base(string $url): string { return rtrim($url,'/').'/'; }
     private static function stored(string $key): string {
         if(isset(self::$raw[$key]))return self::$raw[$key];
@@ -13,11 +14,13 @@ final class Origin_Context {
         $value=isset($wpdb)&&isset($wpdb->options)?$wpdb->get_var($wpdb->prepare("SELECT option_value FROM {$wpdb->options} WHERE option_name=%s",$key)):get_option($key,'');
         return self::$raw[$key]=is_string($value)?$value:'';
     }
-    public static function state(): array {
+    public static function state(bool $refresh=false): array {
+        if(!$refresh&&self::$state!==null)return self::$state;
+        self::$state=array();
         $path=ABSPATH.'.gamb-runtime/compartilhamento/session.json';
         if(!is_file($path)||is_link($path)||filesize($path)>16384)return array();
         $state=json_decode((string)preg_replace('/\A\xEF\xBB\xBF/','',(string)file_get_contents($path)),true);
-        return is_array($state)&&($state['status']??'')==='running'?$state:array();
+        return self::$state=is_array($state)&&($state['status']??'')==='running'?$state:array();
     }
     public static function canonical(string $key='home'): string {
         $raw=self::stored($key);$constant=$key==='siteurl'?'WP_SITEURL':'WP_HOME';

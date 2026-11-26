@@ -3,6 +3,7 @@ $ErrorActionPreference = 'Stop'
 # Copie este arquivo para a raiz do WordPress. Não muda home/siteurl, Apache ou outros projetos.
 $projectRoot = $PSScriptRoot
 $helper = Join-Path $projectRoot 'wp-content\plugins\gamb-wp-static-guard\bin\sharing.php'
+. (Join-Path $projectRoot 'wp-content\plugins\gamb-wp-static-guard\bin\sharing-state.ps1')
 if (-not (Test-Path -LiteralPath (Join-Path $projectRoot 'wp-load.php'))) { throw 'Execute a copia deste script na raiz do WordPress.' }
 if (-not $PhpPath) {
     $phpCommand = Get-Command php -ErrorAction SilentlyContinue
@@ -42,7 +43,7 @@ $stateFile=Join-Path $stateDir 'session.json'
 New-Item -ItemType Directory -Path $stateDir -Force | Out-Null
 Set-Content -LiteralPath (Join-Path $projectRoot '.gamb-runtime\.htaccess') -Value 'Require all denied' -Encoding ASCII
 $state=[ordered]@{status='running';mode='lan-apache';address=$Address;port=80;started_at=(Get-Date).ToString('o');origins=$origins;trusted_proxies=$TrustedProxy;static_url=$lanUrl;admin_url=$lanUrl+'wp-admin/'}
-$state | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $stateFile -Encoding UTF8
+Write-GambSharingState -Path $stateFile -State $state
 try {
     foreach($origin in @($info.canonical,$lanUrl)) {
         $front=Invoke-WebRequest -Uri $origin -UseBasicParsing -TimeoutSec 30
@@ -50,7 +51,7 @@ try {
         $admin=Invoke-WebRequest -Uri ($origin+'wp-admin/') -UseBasicParsing -TimeoutSec 30
         if ($admin.StatusCode -ne 200 -or $admin.BaseResponse.ResponseUri.Host -ne ([Uri]$origin).Host -or $admin.BaseResponse.ResponseUri.AbsolutePath -notmatch '/wp-login\.php$') { throw 'O login administrativo nao preservou sua origem.' }
     }
-} catch { $state.status='stopped';$state | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $stateFile -Encoding UTF8;throw }
+} catch { $state.status='stopped';Write-GambSharingState -Path $stateFile -State $state;throw }
 Write-Output ('Estatico local preservado: '+$info.canonical)
 Write-Output ('Estatico na rede: '+$lanUrl)
 Write-Output ('Admin na rede: '+$state.admin_url)
