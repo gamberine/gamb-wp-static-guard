@@ -1,0 +1,24 @@
+name: Manual e apresentação
+on:
+  push:
+    branches: [main]
+    paths: ['assets/docs/manual.html', 'docs/pages/**', '.github/workflows/pages.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+concurrency: github-pages
+jobs:
+  deploy:
+    environment: github-pages
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/configure-pages@v5
+      - run: |
+          mkdir -p _site
+          cp docs/pages/index.html _site/index.html
+          cp assets/docs/manual.html _site/manual.html
+      - uses: actions/upload-pages-artifact@v3
+      - uses: actions/deploy-pages@v4
