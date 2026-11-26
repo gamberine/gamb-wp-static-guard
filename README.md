@@ -17,7 +17,7 @@ O manual deve ser atualizado junto de cada alteração de função, campo, menu 
 
 ## Finalidade e limites
 
-A versão 5 requer PHP 8.1 ou superior. No PHP 8.1 a 8.3, as extensões DOM e mbstring são necessárias para o parser; no PHP 8.4 ou superior, o parser HTML5 nativo é utilizado quando disponível. A validação automatizada cobre PHP 8.1, 8.2, 8.3 e 8.4, sem presumir compatibilidade irrestrita com futuras versões. Consulte a [arquitetura de segurança e atualização](docs/SECURITY-ARCHITECTURE.md) antes da migração.
+A versão 5 requer PHP 8.1 ou superior. No PHP 8.1 a 8.3, as extensões DOM e mbstring são necessárias para o parser; no PHP 8.4 ou superior, o parser HTML5 nativo é utilizado quando disponível. A validação automatizada inclui PHP 7.4, 8.1, 8.2, 8.3 e 8.4, sem presumir compatibilidade irrestrita com futuras versões. Consulte a [arquitetura de segurança e atualização](docs/SECURITY-ARCHITECTURE.md) antes da migração.
 
 O componente **Static** consulta páginas públicas, reúne recursos e produz HTML, CSS, JavaScript, documentos e um índice de pesquisa local. O componente **Guard** reescreve caminhos de recursos, aplica controles configuráveis à saída e valida o HTML antes da entrega.
 

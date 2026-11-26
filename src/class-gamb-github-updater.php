@@ -84,19 +84,19 @@ final class Gamb_GitHub_Updater {
         set_transient($key, $release ?? array(), 12 * HOUR_IN_SECONDS);
         return $release;
     }
-    public function filter_updates(mixed $transient): mixed {
+    public function filter_updates($transient) {
         if (!is_object($transient)) { return $transient; }
         $release = $this->latest();
         if (!$release) { return $transient; }
-        $item = (object)array('id' => 'https://github.com/' . $this->repository(), 'slug' => self::SLUG, 'plugin' => $this->plugin_file(), 'new_version' => $release['version'], 'url' => $release['url'], 'package' => $release['package'], 'requires' => '6.2', 'requires_php' => '8.1');
+        $item = (object)array('id' => 'https://github.com/' . $this->repository(), 'slug' => self::SLUG, 'plugin' => $this->plugin_file(), 'new_version' => $release['version'], 'url' => $release['url'], 'package' => $release['package'], 'requires' => '6.2', 'requires_php' => '7.4');
         if (version_compare($release['version'], GAMB_STATIC_WP_VERSION, '>')) { $transient->response[$this->plugin_file()] = $item; unset($transient->no_update[$this->plugin_file()]); }
         else { $transient->no_update[$this->plugin_file()] = $item; unset($transient->response[$this->plugin_file()]); }
         return $transient;
     }
-    public function plugin_information(mixed $result, string $action, mixed $args): mixed {
+    public function plugin_information($result, string $action, $args) {
         if ('plugin_information' !== $action || !is_object($args) || ($args->slug ?? '') !== self::SLUG) { return $result; }
         $release = $this->latest(); if (!$release) { return $result; }
-        return (object)array('name' => 'Gamb WP Static Guard', 'slug' => self::SLUG, 'version' => $release['version'], 'author' => 'Gamb', 'homepage' => 'https://github.com/' . $this->repository(), 'requires' => '6.2', 'requires_php' => '8.1', 'download_link' => $release['package'], 'sections' => array('description' => 'Publicação estática com auditoria e controles de exposição.', 'changelog' => wp_kses_post(wpautop(esc_html($release['body'])))));
+        return (object)array('name' => 'Gamb WP Static Guard', 'slug' => self::SLUG, 'version' => $release['version'], 'author' => 'Gamb', 'homepage' => 'https://github.com/' . $this->repository(), 'requires' => '6.2', 'requires_php' => '7.4', 'download_link' => $release['package'], 'sections' => array('description' => 'Publicação estática com auditoria e controles de exposição.', 'changelog' => wp_kses_post(wpautop(esc_html($release['body'])))));
     }
     private function own_operation(array $extra): bool {
         if (isset($extra['plugin'])) { return $extra['plugin'] === $this->plugin_file(); }
@@ -128,7 +128,7 @@ final class Gamb_GitHub_Updater {
         }
         return $args;
     }
-    public function native_system_ca(mixed $handle, array $args, string $url): void {
+    public function native_system_ca($handle, array $args, string $url): void {
         if (PHP_OS_FAMILY !== 'Windows' || !defined('CURLSSLOPT_NATIVE_CA')) { return; }
         try { $own_api = $url === 'https://api.github.com/repos/' . $this->repository() . '/releases/latest'; } catch (\RuntimeException $error) { return; }
         if (!$this->downloading && !$own_api) { return; }
@@ -137,7 +137,7 @@ final class Gamb_GitHub_Updater {
         curl_setopt($handle, CURLOPT_SSL_VERIFYPEER, true);
         curl_setopt($handle, CURLOPT_SSL_VERIFYHOST, 2);
     }
-    public function pre_download(mixed $reply, string $package, mixed $upgrader, array $extra): mixed {
+    public function pre_download($reply, string $package, $upgrader, array $extra) {
         if (false !== $reply || !$this->own_operation($extra)) { return $reply; }
         $release = $this->latest();
         if (!$release || !hash_equals($release['package'], $package) || !$this->allowed_initial_url($package)) { return new \WP_Error('gamb_untrusted_package', 'Pacote GitHub não autorizado para esta atualização.'); }
@@ -162,7 +162,7 @@ final class Gamb_GitHub_Updater {
             return new \WP_Error('gamb_download_failed', $error->getMessage());
         } finally { $this->downloading = false; }
     }
-    public function source_selection(mixed $source, string $remote_source, mixed $upgrader, array $extra): mixed {
+    public function source_selection($source, string $remote_source, $upgrader, array $extra) {
         if (is_wp_error($source) || !$this->own_operation($extra)) { return $source; }
         global $wp_filesystem;
         $source = trailingslashit(wp_normalize_path((string)$source)); $parent = trailingslashit(wp_normalize_path($remote_source));
@@ -172,7 +172,7 @@ final class Gamb_GitHub_Updater {
         if ($wp_filesystem->exists($destination) || !$wp_filesystem->move(untrailingslashit($source), untrailingslashit($destination))) { return new \WP_Error('gamb_source_rename', 'Não foi possível normalizar a pasta do plugin.'); }
         return $destination;
     }
-    public function after_update(mixed $upgrader, array $extra): void {
+    public function after_update($upgrader, array $extra): void {
         if (($extra['action'] ?? '') !== 'update' || !in_array($extra['type'] ?? '', array('core', 'theme', 'plugin'), true)) { return; }
         Gamb_Static_Sanitizer::invalidate_sri_cache(); $this->clear_cache(); Gamb_Static_Auditor::mark_pending();
     }

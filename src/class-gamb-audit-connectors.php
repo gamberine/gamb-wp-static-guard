@@ -53,7 +53,7 @@ final class Audit_Connectors {
         if(!$r['report_at'])return $finish(self::unavailable($r,'O provedor não informou data válida de conclusão da avaliação.'));
         // Consume only structured counts; raw requests, responses and credentials in a report are never retained.
         $findings=$data['vulnerabilities']??null;
-        if(!is_array($findings)||!array_is_list($findings)||array_filter($findings,static fn($f)=>!is_array($f)))return $finish(self::unavailable($r,'Relatório existente sem lista de achados reconhecida; nenhum resumo foi presumido.'));
+        if(!is_array($findings)||array_values($findings)!==$findings||array_filter($findings,static fn($f)=>!is_array($f)))return $finish(self::unavailable($r,'Relatório existente sem lista de achados reconhecida; nenhum resumo foi presumido.'));
         if(isset($data['scan']['scan_id'])&&$data['scan']['scan_id']!==$r['scan_id'])return $finish(self::unavailable($r,'O relatório retornado pertence a outra avaliação.'));
         $counts=array_fill_keys(array('critical','high','medium','low','info','unknown'),0);
         foreach($findings as $f){$severity=$f['severity']??$f['plugin']['risk_factor']??'unknown';if(!is_scalar($severity))$severity='unknown';if(is_int($severity)||ctype_digit((string)$severity))$severity=array(0=>'info',1=>'low',2=>'medium',3=>'high',4=>'critical')[(int)$severity]??'unknown';$key=strtolower((string)$severity);if(!isset($counts[$key]))$key='unknown';$counts[$key]++;}

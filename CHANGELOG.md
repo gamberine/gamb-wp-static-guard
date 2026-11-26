@@ -4,6 +4,8 @@ Este documento distingue a incorporação histórica das novas alterações. As 
 
 ## 5.4.1 - 2026-11-25
 
+- Restaurar a compatibilidade com PHP 7.4 e incluir essa vers?o na matriz de CI.
+
 - Reorganizar o painel de destino, manter a ação de salvar disponível e vincular alertas às abas de diagnóstico e auditoria.
 - Usar a URL da instalação como base do destino padrão, bloquear o domínio pai e impedir caminhos acima da instalação no mesmo host. Exigir HTTPS em destinos externos.
 

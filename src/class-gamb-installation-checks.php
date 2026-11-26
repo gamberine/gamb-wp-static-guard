@@ -264,11 +264,10 @@ class Installation_Checks {
         $hash_available = function_exists( 'hash_hmac' ) && in_array( 'sha256', hash_algos(), true );
         $add( 'crypto', $hash_available ? 'ok' : 'error', $hash_available ? 'HMAC SHA-256 disponível para validação dos tokens.' : 'HMAC SHA-256 indisponível; os tokens de recursos não podem ser validados.' );
 		$zip_backend = Backup_Service::zip_backend();
-		$add( 'zip', '' !== $zip_backend ? 'ok' : 'warning', match ( $zip_backend ) {
+		$add( 'zip', '' !== $zip_backend ? 'ok' : 'warning', array(
 			'native' => 'Extensão ZIP disponível.',
 			'pclzip' => 'PclZip do WordPress disponível para exportação estática e backup de banco, tema e extensões.',
-			default  => 'ZIP nativo e alternativa do WordPress indisponíveis. Habilite ZIP ou zlib para gerar pacotes ZIP.',
-		} );
+		)[$zip_backend] ?? 'ZIP nativo e alternativa do WordPress indisponíveis. Habilite ZIP ou zlib para gerar pacotes ZIP.' );
         $types = array_diff( get_post_types( array( 'public' => true ), 'names' ), array( 'attachment' ) );
         $add( 'post_types', 'ok', 'Tipos públicos disponíveis: ' . implode( ', ', $types ) . '.' );
         $add( 'first_export', 'ok', Options::instance()->get( 'first_full_export_completed', false ) ? 'Primeira publicação completa já concluída.' : 'A primeira publicação será completa; os outros escopos serão liberados após a entrega.' );

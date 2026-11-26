@@ -3,7 +3,7 @@ Contributors: gamberine
 Tags: static-site, export, security, local-search
 Requires at least: 6.2
 Tested up to: 7.1
-Requires PHP: 8.1
+Requires PHP: 7.4
 Stable tag: 5.4.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/old-licenses/gpl-2.0.html

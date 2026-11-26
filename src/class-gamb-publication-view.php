@@ -29,7 +29,7 @@ final class Publication_View {
         $meta=json_decode((string)file_get_contents($receipt),true);
         if(!is_array($meta)||($meta['public_url']??'')!==Destination_Audit::base(home_url('/'))||($meta['environment']??'')!==($o['destination_environment']??'production')){$result['message']='A entrega existente pertence a outro destino/ambiente. Reexporte antes de apresentar o estático.';return $result;}
         $files=json_decode((string)file_get_contents($manifest),true);
-        if(!is_array($files)||!array_is_list($files)||count($files)>20000||!in_array('index.html',$files,true)||!self::resolve($root,'index.html')){$result['message']='Home ou manifesto da entrega indisponível.';return $result;}
+        if(!is_array($files)||array_values($files)!==$files||count($files)>20000||!in_array('index.html',$files,true)||!self::resolve($root,'index.html')){$result['message']='Home ou manifesto da entrega indisponível.';return $result;}
         $result['ready']=true;$result['message']='A URL principal apresenta os arquivos estáticos da última entrega. WordPress permanece disponível no admin e na captura assinada.';return $result;
     }
     public static function resolve(string $root,string $relative): ?string {

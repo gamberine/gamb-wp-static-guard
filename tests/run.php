@@ -15,6 +15,12 @@ function wp_load_alloptions() { return $GLOBALS['fixture_options']; }
 function maybe_unserialize( $value ) { return $value; }
 function is_admin() { return false; }
 function home_url( $path = '' ) { return 'https://example.test/site' . $path; }
+// O WordPress fornece estas fun??es em PHP 7.4. A su?te tamb?m roda sem o WordPress.
+if (!function_exists('str_contains')) {
+    function str_contains(string $text, string $part): bool { return $part === '' || strpos($text, $part) !== false; }
+    function str_starts_with(string $text, string $part): bool { return $part === '' || strpos($text, $part) === 0; }
+    function str_ends_with(string $text, string $part): bool { return $part === '' || substr($text, -strlen($part)) === $part; }
+}
 function wp_salt( $scheme = '' ) { return AUTH_KEY; }
 function untrailingslashit( $path ) { return rtrim( $path, '/\\' ); }
 function trailingslashit( $path ) { return untrailingslashit( $path ) . '/'; }

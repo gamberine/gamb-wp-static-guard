@@ -436,11 +436,10 @@ class Backup_Service {
 				"category" => "Ambiente & Servidor",
 				"label"    => "Suporte ZIP",
 				"ok"       => '' !== self::zip_backend(),
-				"detail"   => match ( self::zip_backend() ) {
+				"detail"   => array(
 					'native' => "Extensão ZIP nativa disponível.",
 					'pclzip' => "PclZip disponível para o backup completo. O backup de banco é gerado em SQL.",
-					default  => "Habilite ZIP ou zlib para gerar pacotes de backup.",
-				},
+				)[self::zip_backend()] ?? "Habilite ZIP ou zlib para gerar pacotes de backup.",
 			),
 			array(
 				"category" => "1. STATIC - Diretórios",
