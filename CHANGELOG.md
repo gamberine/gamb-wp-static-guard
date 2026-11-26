@@ -5,6 +5,7 @@ Este documento distingue a incorporação histórica das novas alterações. As 
 ## 5.5.1 - 2026-11-26
 
 - Gravação atômica com repetição limitada do estado de compartilhamento no Windows.
+- Estado privado independente das opções de exportação: workers antigos não reativam um acesso revogado.
 - Uma leitura de estado por requisição, evitando contenção e mistura de origens durante parar/reiniciar.
 - Manual esclarece URL canônica estável, isolamento de cookies e Host preservado no proxy online.
 

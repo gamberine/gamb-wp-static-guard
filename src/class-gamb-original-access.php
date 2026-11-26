@@ -5,9 +5,11 @@ if (!defined('ABSPATH')) { exit; }
 
 /** WordPress original privado: switch opt-in + administrador + nonce da sessão. */
 final class Original_Access {
+    public const OPTION='gamb_static_guard_original_access';
     private static $current=false;
     public static function current(): bool { return self::$current; }
-    public static function enabled(): bool { return (bool)Options::instance()->get('original_access_enabled',false)&&(int)Options::instance()->get('original_access_expires_at',0)>time(); }
+    private static function state(): array { $value=get_option(self::OPTION,array());return is_array($value)?$value:array(); }
+    public static function enabled(): bool { $value=self::state();return ($value['enabled']??false)===true&&(int)($value['expires_at']??0)>time(); }
     public static function allowed(bool $enabled,bool $admin,bool $nonce,bool $origin,string $method): bool { return $enabled&&$admin&&$nonce&&$origin&&in_array($method,array('GET','HEAD'),true); }
     public static function register(): void {
         add_action('init',array(__CLASS__,'detect'),-20000);
@@ -41,7 +43,7 @@ final class Original_Access {
     }
     public static function status(): array {
         $enabled=self::enabled();
-        return array('enabled'=>$enabled,'expires_at'=>$enabled?(int)Options::instance()->get('original_access_expires_at',0):0,'url'=>$enabled&&current_user_can('manage_options')?self::url():'','message'=>$enabled?'Acesso WP original ativado por até uma hora: somente administradores autenticados, com link da própria sessão.':'URL de acesso WP desativada. A URL principal continua estática.');
+        return array('enabled'=>$enabled,'expires_at'=>$enabled?(int)(self::state()['expires_at']??0):0,'url'=>$enabled&&current_user_can('manage_options')?self::url():'','message'=>$enabled?'Acesso WP original ativado por até uma hora: somente administradores autenticados, com link da própria sessão.':'URL de acesso WP desativada. A URL principal continua estática.');
     }
     public static function url(string $url=''): string { return add_query_arg(array('gamb_wp_original'=>'1','_gamb_wp_nonce'=>wp_create_nonce('gamb-original-access')),$url?:home_url('/')); }
     public static function toggle($request) {
@@ -50,7 +52,8 @@ final class Original_Access {
         if(!is_bool($enabled))return new \WP_Error('invalid_access','Informe um estado booleano.',array('status'=>400));
         if($enabled&&$request->get_param('confirmed')!==true)return new \WP_Error('confirmation_required','Confirme o aviso de acesso ao WordPress original.',array('status'=>400));
         if(!Origin_Context::request_home())return new \WP_Error('unsafe_origin','Use um endereço autorizado desta instalação.',array('status'=>403));
-        Options::instance()->set('original_access_enabled',$enabled)->set('original_access_expires_at',$enabled?time()+3600:0)->save();Gamb_Security_Suite::purge_page_caches();
+        // Estado independente: um worker de exportação com opções antigas não pode desfazer a revogação.
+        update_option(self::OPTION,array('enabled'=>$enabled,'expires_at'=>$enabled?time()+3600:0),false);Gamb_Security_Suite::purge_page_caches();
         return rest_ensure_response(self::status());
     }
     public static function toolbar($bar): void {
