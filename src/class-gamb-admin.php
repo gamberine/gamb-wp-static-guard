@@ -225,6 +225,7 @@ class Admin_Controller
             $params['destination_scheme']=$parsed['scheme'].'://';$params['destination_host']=strtolower($parsed['host']).(isset($parsed['port'])?':'.$parsed['port']:'');$params['relative_path']=trim($parsed['path']??'','/');unset($params['public_url']);
         }
         if(isset($params['public_site_mode'])&&!in_array($params['public_site_mode'],array('wordpress','static'),true))return new \WP_Error('invalid_presentation','Selecione WordPress ou publicação estática.',array('status'=>400));
+        if(($params['public_site_mode']??'')==='wordpress'&&$options->get('public_site_mode')!=='wordpress')return new \WP_Error('private_original_required','Use Ativar URL acesso WP para validar o original com confirmação e acesso privado. A URL principal permanece estática.',array('status'=>400));
         foreach (array('version_monitor_allowed_ips', 'version_monitor_trusted_proxies') as $key) {
             if (array_key_exists($key, $params)) {
                 $parsed = Version_Monitor::validate_list($params[$key]);
@@ -545,10 +546,10 @@ class Admin_Controller
                         <h2>Destino e endereços</h2>
                         <div class="gamb-callout gamb-project-mode">
                             <div class="gamb-project-row"><div><label class="gamb-field" for="gamb-public-site-mode">O que abrir na URL principal do projeto</label>
-                            <select id="gamb-public-site-mode" data-opt="public_site_mode"><option value="wordpress" <?php selected($options['public_site_mode']??'wordpress','wordpress'); ?>>WordPress</option><option value="static" <?php selected($options['public_site_mode']??'wordpress','static'); ?>>Publicação estática na URL principal</option></select></div>
+                            <select id="gamb-public-site-mode" data-opt="public_site_mode"><?php if(($options['public_site_mode']??'')==='wordpress'): ?><option value="wordpress" selected>WordPress legado — migrar para estático</option><?php endif; ?><option value="static" <?php selected($options['public_site_mode']??'static','static'); ?>>Publicação estática na URL principal</option></select></div>
                             <p>Acesso nesta origem: <a href="<?php echo esc_url(home_url('/')); ?>" target="_blank" rel="noopener noreferrer"><?php echo esc_html(home_url('/')); ?></a></p></div>
                             <p data-public-site-status><?php echo esc_html(Publication_View::status()['message']); ?></p>
-                            <small>Estático é o padrão. Para validar arquivos, use o acesso WP privado abaixo. O modo WordPress desta seleção é público e foi mantido apenas por compatibilidade.</small>
+                            <small>Estático é o padrão. Para validar arquivos, use o acesso WP privado abaixo. Perfis legados são preservados até a migração para estático.</small>
                         </div>
                         <fieldset class="gamb-origin-section"><legend>1. Endereço da publicação</legend>
                             <div class="gamb-url-editor"><div><label class="gamb-field" for="gamb-public-url">URL pública completa</label><input id="gamb-public-url" type="url" data-public-url value="<?php echo esc_attr($saved_public_url?:Origin_Context::canonical()); ?>" placeholder="https://site.exemplo.org/portal/"></div>
