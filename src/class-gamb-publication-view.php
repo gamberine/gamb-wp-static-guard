@@ -12,9 +12,8 @@ final class Publication_View {
         if(($settings['delivery_method']??'')!=='local')return 'A apresentação estática na raiz requer entrega local.';
         foreach(array('destination_scheme','destination_host','relative_path')as$key){if(!is_string($settings[$key]??''))return 'Valor de destino invalido.';}
         $home=Destination_Audit::base(home_url('/'));
-        $base=($settings['destination_scheme']??'https://').($settings['destination_host']??'');
-        $hostPath=wp_parse_url($base,PHP_URL_PATH);
-        if(!$hostPath||$hostPath==='/')$base=rtrim($base,'/').'/'.trim((string)($settings['relative_path']??''),'/');
+        try { $base = Static_Engine::resolve_public_base($settings); }
+        catch (\RuntimeException $error) { return $error->getMessage(); }
         if(Destination_Audit::base($base)!==$home)return 'Para apresentar o estático na raiz, use a URL principal do projeto como destino. Clique em Usar endereço local do projeto.';
         if(($settings['destination_url_type']??'')==='offline')return 'Use endereços relativos ao domínio ou absolutos para apresentar o estático na raiz.';
         return null;

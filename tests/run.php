@@ -80,7 +80,7 @@ expect( $blocked, 'Interromper HTML com referência residual.' );
 $engine = ( new ReflectionClass( '\GambWPStaticGuard\Static_Engine' ) )->newInstanceWithoutConstructor();
 $options->set( 'destination_url_type', 'relative' )->set( 'relative_path', '/preview' );
 $url = $engine->apply_url_replacement_mode( 'https://example.test/site/index.php/news/', 'index.html' );
-expect( $url === '/preview/news/', 'Converter permalinks para publicação estática.' );
+expect( $url === '/site/preview/news/', 'Converter permalinks para publicação estática.' );
 expect( $engine->apply_url_replacement_mode( $url, 'index.html' ) === $url, 'Evitar substituição duplicada.' );
 expect( ! \GambWPStaticGuard\Gamb_Security_Suite::is_public_asset( 'handler.php' ), 'Rejeitar código de servidor.' );
 expect( ! \GambWPStaticGuard\Gamb_Security_Suite::is_public_asset( 'database.sql' ), 'Rejeitar dump SQL.' );

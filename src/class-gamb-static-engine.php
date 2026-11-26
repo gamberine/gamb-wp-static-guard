@@ -510,15 +510,51 @@ class Static_Engine {
 
 	/** URL pública também para canonical em modos relativo e offline. */
 	public function public_base_url() {
-		$opts = Options::instance();
+		return self::resolve_public_base( Options::instance()->get_all() );
+	}
+
+	public static function local_public_host( $host ) {
+		$host = strtolower( trim( $host, '[]' ) );
+		return in_array( $host, array( 'localhost', '::1' ), true ) || str_ends_with( $host, '.localhost' )
+			|| str_ends_with( $host, '.local' ) || str_ends_with( $host, '.test' ) || ( str_starts_with( $host, '127.' ) && filter_var( $host, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4 ) );
+	}
+
+	public static function resolve_public_base( array $settings ) {
 		$home = wp_parse_url( home_url( '/' ) );
-		$host = trim( (string) $opts->get( 'destination_host', '' ), '/\\' );
-		$base = '' !== $host ? (string) $opts->get( 'destination_scheme', 'https://' ) . $host : $home['scheme'] . '://' . $home['host'] . ( isset( $home['port'] ) ? ':' . $home['port'] : '' );
-		$parts = wp_parse_url( $base );
-		if ( ! $parts || ! in_array( $parts['scheme'] ?? '', array( 'http', 'https' ), true ) || empty( $parts['host'] ) || isset( $parts['user'] ) || isset( $parts['pass'] ) || isset( $parts['query'] ) || isset( $parts['fragment'] ) ) { throw new \RuntimeException( 'Configure uma URL pública válida para o destino.' ); }
-		$path = trim( (string) ( $parts['path'] ?? '' ), '/' );
-		if ( '' === $path ) { $path = trim( (string) $opts->get( 'relative_path', '' ), '/' ); }
-		return $parts['scheme'] . '://' . $parts['host'] . ( isset( $parts['port'] ) ? ':' . $parts['port'] : '' ) . '/' . ( '' !== $path ? $path . '/' : '' );
+		$input = trim( (string) ( $settings['destination_host'] ?? '' ), '/' );
+		if ( preg_match( '~[\\\\\x00-\x20]~', $input ) ) {
+			throw new \RuntimeException( 'Configure um domínio público válido para o destino.' );
+		}
+		$parts = $input === '' ? $home : wp_parse_url( 'https://' . $input );
+		if ( ! $parts || empty( $parts['host'] ) || isset( $parts['user'] ) || isset( $parts['pass'] ) || isset( $parts['query'] ) || isset( $parts['fragment'] ) ) {
+			throw new \RuntimeException( 'Configure um domínio público válido para o destino.' );
+		}
+		$host = strtolower( rtrim( $parts['host'], '.' ) );
+		$home_host = strtolower( rtrim( $home['host'], '.' ) );
+		if ( $host !== $home_host && str_ends_with( $home_host, '.' . $host ) ) {
+			throw new \RuntimeException( 'Use o subdomínio da instalação. O domínio principal não pode receber esta publicação.' );
+		}
+		$home_path = trim( (string) ( $home['path'] ?? '' ), '/' );
+		$host_path = $input === '' ? '' : trim( (string) ( $parts['path'] ?? '' ), '/' );
+		$relative = trim( (string) ( $settings['relative_path'] ?? '' ), '/' );
+		if ( $input === '' && $relative === '' && ($settings['delivery_method'] ?? '') === 'local' ) {
+			$relative = rawurlencode( basename( wp_normalize_path( (string) ( $settings['local_dir'] ?? '' ) ) ) );
+		}
+		foreach ( array( $host_path, $relative ) as $path ) {
+			$decoded = rawurldecode( $path );
+			if ( preg_match( '~(?:^|/)\.{1,2}(?:/|$)|[\\\\%\x00-\x1f]|//~', $decoded ) || substr_count( $decoded, '/' ) !== substr_count( $path, '/' ) ) {
+				throw new \RuntimeException( 'Use um caminho público válido dentro da instalação.' );
+			}
+		}
+		$path = $host_path !== '' ? $host_path : $relative;
+		if ( $host === $home_host && $home_path !== '' && $path !== $home_path && ! str_starts_with( $path, $home_path . '/' ) ) {
+			if ( $host_path !== '' ) {
+				throw new \RuntimeException( 'O caminho público deve estar na raiz da instalação ou abaixo dela.' );
+			}
+			$path = $home_path . ( $path !== '' ? '/' . $path : '' );
+		}
+		$scheme = self::local_public_host( $host ) && ( $settings['destination_scheme'] ?? '' ) === 'http://' ? 'http://' : 'https://';
+		return $scheme . $host . ( isset( $parts['port'] ) ? ':' . $parts['port'] : '' ) . '/' . ( $path !== '' ? $path . '/' : '' );
 	}
 
 	public static function same_origin( $first, $second ) {

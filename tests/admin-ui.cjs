@@ -19,12 +19,13 @@ const publication={label:'Atualizado',tone:'success',message:'Entrega registrada
 const rows=[{filename:'fixture.sql',created_at:'23/11/2026',size_formatted:'1 MB',download_url:'https://example.test/download?file=fixture.sql'}];
 let confirmations=0,deletions=0;
 const context=vm.createContext({
-  root:{querySelector:selector=>nodes[selector]},document:{createElement:element},busy:false,
+  root:{querySelector:selector=>nodes[selector],querySelectorAll:()=>[]},document:{createElement:element},busy:false,
   request:async route=>{assert(['publication-status','backups'].includes(route));return route==='backups'?rows:publication;},
   confirm:()=>{confirmations++;return false;},task:()=>{deletions++;},
 });
 for(const name of ['sectionBadges','publication','backups']){
-  const line=source.split('\n').find(line=>line.startsWith('    function '+name+'('));
+  const start=source.indexOf('    function '+name+'(');
+  const line=start<0?'':source.slice(start).split(/\r?\n    (?:function |var |root\.|window\.)/)[0];
   assert(line,'Função ausente: '+name);vm.runInContext(line,context);
 }
 (async()=>{
