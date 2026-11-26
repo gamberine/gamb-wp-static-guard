@@ -141,4 +141,5 @@ require __DIR__ . '/admin.php';
 require __DIR__ . '/insights.php';
 require __DIR__ . '/destination-audit.php';
 require __DIR__ . '/publication-view.php';
+require __DIR__ . '/origin-access.php';
 echo $checks . " verificações independentes concluídas.\n";

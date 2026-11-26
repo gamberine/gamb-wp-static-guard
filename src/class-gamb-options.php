@@ -8,7 +8,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 /**
- * Gamb WP Static Guard - Gerenciador Central de Opções e Perfil Padrão Seguro (v5.4.1).
+ * Gamb WP Static Guard - Gerenciador Central de Opções e Perfil Padrão Seguro (v5.5.0).
  *
  * Mantém compatibilidade com a chave 'gamb-wp-static-guard' no wp_options e separa claramente
  * as configurações de 1. STATIC (Conversão & Publicação) e 2. GUARD (Ocultação & Segurança).
@@ -17,7 +17,7 @@ class Options {
 
 	const OPTION_KEY  = 'gamb_wp_static_guard';
 	const VERSION_KEY = 'gamb_wp_static_guard_profile_version';
-	const VERSION     = '5.4.1';
+	const VERSION     = '5.5.0';
 
 	private static $instance = null;
 	private $options = array();
@@ -41,6 +41,7 @@ class Options {
 			$stored = array();
 		}
 		$this->options = array_merge( self::get_default_options(), $stored );
+		if ($stored && !array_key_exists('public_site_mode', $stored)) $this->options['public_site_mode'] = 'wordpress';
 	}
 
 	/**
@@ -84,7 +85,9 @@ class Options {
 			'refresh_local_integrity'          => true,
 			'disable_local_integrity'          => false, // Somente destinos cujo CDN/proxy transforma os bytes.
 			'destination_environment'          => 'production', // production | preview | homologation
-            'public_site_mode'                 => 'wordpress', // wordpress | static at the existing home URL
+            'public_site_mode'                 => 'static', // Estático por padrão; perfis existentes são preservados.
+            'original_access_enabled'          => false,
+            'original_access_expires_at'       => 0,
 			'require_local_dependencies'       => false,
 			'add_feeds'                        => false,
 			'add_rest_api'                     => false,
@@ -231,6 +234,7 @@ class Options {
 	}
 
 	public function get( $key, $default = null ) {
+        if($key==='guard_active_on_live_site'&&class_exists(Original_Access::class)&&Original_Access::current())return false;
 		return array_key_exists( $key, $this->options ) ? $this->options[ $key ] : $default;
 	}
 

@@ -105,6 +105,10 @@ class Admin_Controller
                 return Version_Monitor::status();
             }),
             '/settings' => array(array('methods' => 'GET', 'callback' => array($this, 'rest_get_settings')), array('methods' => 'POST', 'callback' => array($this, 'rest_save_settings'))),
+            '/original-access' => array(
+                array('methods'=>'GET','callback'=>static function(){return rest_ensure_response(Original_Access::status());}),
+                array('methods'=>'POST','callback'=>static function($request){if(!wp_verify_nonce((string)$request->get_header('X-WP-Nonce'),'wp_rest'))return new \WP_Error('invalid_nonce','Recarregue o painel.',array('status'=>403));return Original_Access::toggle($request);}),
+            ),
             '/start-export' => array('methods' => 'POST', 'callback' => array($this, 'rest_start_export')),
             '/diagnostics' => array(array('methods' => 'GET', 'callback' => array($this, 'rest_get_diagnostics')), array('methods' => 'POST', 'callback' => array($this, 'rest_run_diagnostics'))),
             '/security-status' => array('methods' => 'GET', 'callback' => array($this, 'rest_security_status')),
@@ -214,6 +218,12 @@ class Admin_Controller
         $options = Options::instance();
         $defaults = Options::get_default_options();
         $params = $request->get_params();
+        if(isset($params['original_access_enabled'])||isset($params['original_access_expires_at']))return new \WP_Error('dedicated_control','Use o switch Ativar URL acesso WP e confirme o aviso.',array('status'=>400));
+        if(array_key_exists('public_url',$params)){
+            $url=$params['public_url'];$parsed=is_string($url)?wp_parse_url($url):false;
+            if(!$parsed||empty($parsed['host'])||!in_array($parsed['scheme']??'',array('http','https'),true)||isset($parsed['user'])||isset($parsed['pass'])||isset($parsed['query'])||isset($parsed['fragment'])||preg_match('~[\x00-\x20<>"\x27`\\\\]|%(?:2f|5c|2e)~i',$url))return new \WP_Error('invalid_public_url','Informe a URL completa, sem credenciais, parâmetros ou fragmento.',array('status'=>400));
+            $params['destination_scheme']=$parsed['scheme'].'://';$params['destination_host']=strtolower($parsed['host']).(isset($parsed['port'])?':'.$parsed['port']:'');$params['relative_path']=trim($parsed['path']??'','/');unset($params['public_url']);
+        }
         if(isset($params['public_site_mode'])&&!in_array($params['public_site_mode'],array('wordpress','static'),true))return new \WP_Error('invalid_presentation','Selecione WordPress ou publicação estática.',array('status'=>400));
         foreach (array('version_monitor_allowed_ips', 'version_monitor_trusted_proxies') as $key) {
             if (array_key_exists($key, $params)) {
@@ -272,7 +282,9 @@ class Admin_Controller
         if (isset($params['destination_scheme'])) {
             $params['destination_scheme'] = wp_parse_url($resolved, PHP_URL_SCHEME) . '://';
         }
-        $presentation=Publication_View::settings_error(array_merge($options->get_all(),$params));
+        $candidate=array_merge($options->get_all(),$params);
+        if(class_exists(Origin_Context::class)){$originError=Origin_Context::destination_error($candidate);if($originError)return new \WP_Error('invalid_origin',$originError,array('status'=>400));}
+        $presentation=Publication_View::settings_error($candidate);
         if($presentation)return new \WP_Error('invalid_presentation',$presentation,array('status'=>400));
         if ('' !== $new_token || $clear_token) {
             Gamb_GitHub_Updater::instance()->clear_cache();
@@ -414,6 +426,7 @@ class Admin_Controller
         $publication = Publication_Status::snapshot();
         $sections = self::section_badges();
         try { $public_url=Static_Engine::get_instance()->public_base_url(); } catch (\Throwable $error) { $public_url=''; }
+        $saved_public_url=$public_url;if(class_exists(Origin_Context::class))$public_url=Origin_Context::map($public_url);
         $publication_resources = get_option(Installation_Checks::EXPORT_OPTION, array());
         $resources = ! empty($publication_resources) ? $publication_resources : ($diagnostics['resources'] ?? array());
 ?>
@@ -533,11 +546,20 @@ class Admin_Controller
                         <div class="gamb-callout gamb-project-mode">
                             <div class="gamb-project-row"><div><label class="gamb-field" for="gamb-public-site-mode">O que abrir na URL principal do projeto</label>
                             <select id="gamb-public-site-mode" data-opt="public_site_mode"><option value="wordpress" <?php selected($options['public_site_mode']??'wordpress','wordpress'); ?>>WordPress</option><option value="static" <?php selected($options['public_site_mode']??'wordpress','static'); ?>>Publicação estática na URL principal</option></select></div>
-                            <p>URL principal: <a href="<?php echo esc_url(home_url('/')); ?>" target="_blank" rel="noopener noreferrer"><?php echo esc_html(home_url('/')); ?></a></p>
-                            <button type="button" class="button" data-use-project-url data-project-url="<?php echo esc_url(home_url('/')); ?>">Usar endereço local do projeto</button></div>
+                            <p>Acesso nesta origem: <a href="<?php echo esc_url(home_url('/')); ?>" target="_blank" rel="noopener noreferrer"><?php echo esc_html(home_url('/')); ?></a></p></div>
                             <p data-public-site-status><?php echo esc_html(Publication_View::status()['message']); ?></p>
-                            <small>O modo estático exige entrega local na URL principal e uma publicação completa correspondente. O admin continua acessível; retornar a WordPress não remove os arquivos exportados.</small>
+                            <small>Estático é o padrão. Para validar arquivos, use o acesso WP privado abaixo. O modo WordPress desta seleção é público e foi mantido apenas por compatibilidade.</small>
                         </div>
+                        <fieldset class="gamb-origin-section"><legend>1. Endereço da publicação</legend>
+                            <div class="gamb-url-editor"><div><label class="gamb-field" for="gamb-public-url">URL pública completa</label><input id="gamb-public-url" type="url" data-public-url value="<?php echo esc_attr($saved_public_url?:Origin_Context::canonical()); ?>" placeholder="https://site.exemplo.org/portal/"></div>
+                            <button type="button" class="button" data-use-project-url data-project-url="<?php echo esc_url(Origin_Context::canonical()); ?>">Usar URL padrão da instalação</button></div>
+                            <p class="gamb-help">Protocolo, domínio e caminho ficam neste único campo. Localhost e IP compartilham a mesma entrega; o acesso atual não altera o endereço salvo.</p>
+                        </fieldset>
+                        <fieldset class="gamb-origin-section"><legend>2. WordPress original — validação privada</legend>
+                            <div class="gamb-original-settings"><button type="button" class="button" role="switch" aria-checked="<?php echo Original_Access::enabled()?'true':'false'; ?>" data-gamb-original-toggle>Ativar URL acesso WP — <span data-gamb-original-state><?php echo Original_Access::enabled()?'Ativado':'Desativado'; ?></span></button><a class="button" data-gamb-original-open href="<?php echo Original_Access::enabled()?esc_url(Original_Access::url()):'#'; ?>" target="_blank" rel="noopener noreferrer" <?php if(!Original_Access::enabled())echo 'hidden'; ?>>Abrir WordPress original ↗</a></div>
+                            <p data-gamb-original-message><?php echo esc_html(Original_Access::status()['message']); ?></p><p class="gamb-help">Exige confirmação, permissão administrativa e link da própria sessão. Expira em uma hora. A URL principal permanece estática e o admin mostra um alerta fixo.</p>
+                        </fieldset>
+                        <h3>3. Entrega e ambiente</h3>
                         <p class="gamb-help gamb-destination-address"><span data-proposed-url></span> <span data-saved-address hidden>Salvo: <a data-publication-url href="<?php echo esc_url($public_url); ?>" target="_blank" rel="noopener noreferrer"><?php echo esc_html($public_url); ?></a></span></p>
                         <div class="gamb-delivery-row">
                         <div>
@@ -554,14 +576,9 @@ class Admin_Controller
                             <option value="offline" <?php selected($options['destination_url_type'], 'offline'); ?>>Relativo ao arquivo</option>
                         </select>
                         </div>
-                        <div><?php $this->input('relative_path', 'Caminho público da publicação', $options); ?></div>
-                        <div><?php $this->input('destination_host', 'Domínio público do destino (pode incluir caminho)', $options); ?></div>
-                        <div>
-                        <label class="gamb-field" for="gamb-destination-scheme">Protocolo público do destino</label><select id="gamb-destination-scheme" data-opt="destination_scheme">
-                            <option value="https://" <?php selected($options['destination_scheme'], 'https://'); ?>>HTTPS</option>
-                            <option value="http://" <?php selected($options['destination_scheme'], 'http://'); ?>>HTTP</option>
-                        </select>
-                        </div>
+                        <input type="hidden" data-opt="relative_path" value="<?php echo esc_attr($options['relative_path']); ?>">
+                        <input type="hidden" data-opt="destination_host" value="<?php echo esc_attr($options['destination_host']); ?>">
+                        <input type="hidden" data-opt="destination_scheme" value="<?php echo esc_attr($options['destination_scheme']); ?>">
                         <div>
                         <label class="gamb-field" for="gamb-environment">Ambiente do destino</label><select id="gamb-environment" data-opt="destination_environment">
                             <option value="production" <?php selected($options['destination_environment'], 'production'); ?>>Produção — preservar indexação</option>
@@ -570,7 +587,7 @@ class Admin_Controller
                         </select>
                         </div>
                         </div>
-                        <p class="gamb-help">A URL pública parte da instalação. Para entrega local, o nome da pasta completa o endereço quando não há caminho informado. Preview e homologação dependem dos cabeçalhos publicados pelo servidor.</p>
+                        <p class="gamb-help">Para localhost e compartilhamento por IP, use HTTP e endereços relativos ao domínio. Em preview/homologação, a publicação recebe noindex. Instalações em subdomínio não podem publicar no domínio principal.</p>
                     </section>
                     <section class="gamb-panel" id="panel-conversion" data-settings-panel hidden>
                         <h2>Conteúdo e conversão</h2>

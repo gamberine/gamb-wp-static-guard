@@ -26,6 +26,7 @@ final class Admin_Insights {
     }
     public static function help(): array {
         $rows=array(
+            'public_url'=>array('Endereço completo da publicação, separado da pasta física. Não é alterado ao acessar o admin por um IP autorizado.','No Laragon: http://localhost/gaepe-minas/. Use INICIAR-COMPARTILHAMENTO para registrar o IP da rede sem trocar esse destino.'),
             'public_site_mode'=>array('Escolhe o que abre na URL principal do projeto. O modo estático lê a entrega local; admin, API e captura assinada continuam no WordPress. Não altera Apache, DNS ou outros projetos.','No Laragon, use o endereço local do projeto, publique o site completo e escolha Publicação estática na URL principal.'),
             'delivery_method'=>array('Escolhe como entregar o resultado. A pasta local recebe os arquivos; ZIP gera um pacote para transporte.','Use Diretório local no servidor que já hospeda o preview.'),
             'local_dir'=>array('Pasta física exclusiva no servidor. A verificação é somente leitura; Criar pasta exige ação explícita. Não define a URL pública.','Use a sugestão de pasta e clique em Verificar pasta antes de salvar.'),
@@ -72,7 +73,7 @@ final class Admin_Insights {
         return $tips[$id]??'Revise a mensagem, corrija a origem quando necessário e execute novamente o diagnóstico.';
     }
     public static function publication(int $page = 1, bool $full = false, bool $audit_read_only = false): array {
-        $opts=Options::instance();try{$public_url=Static_Engine::get_instance()->public_base_url();}catch(\Throwable $error){$public_url='';} $info=array('public_url'=>$public_url,'environment'=>$opts->get('destination_environment','production'),'method'=>$opts->get('delivery_method'),'directory'=>$opts->get('local_dir',''),'processed_units'=>(int)$opts->get('last_export_files_count',0),'published_at'=>$opts->get('last_export_time',''),'files'=>array(),'count'=>0,'page'=>max(1,$page),'per_page'=>100,'inventory_available'=>false,'message'=>'O inventário será disponibilizado após uma entrega local com manifesto.');
+        $opts=Options::instance();try{$public_url=Static_Engine::get_instance()->public_base_url();}catch(\Throwable $error){$public_url='';} if(class_exists(Origin_Context::class))$public_url=Origin_Context::map($public_url); $info=array('public_url'=>$public_url,'environment'=>$opts->get('destination_environment','production'),'method'=>$opts->get('delivery_method'),'directory'=>$opts->get('local_dir',''),'processed_units'=>(int)$opts->get('last_export_files_count',0),'published_at'=>$opts->get('last_export_time',''),'files'=>array(),'count'=>0,'page'=>max(1,$page),'per_page'=>100,'inventory_available'=>false,'message'=>'O inventário será disponibilizado após uma entrega local com manifesto.');
         if ($info['method']!=='local') { $info['message']='Entrega em ZIP: consulte o pacote gerado. A listagem local não certifica o conteúdo do pacote.'; return $info; }
         $root=Publication_Destination::validate($info['directory'],$audit_read_only); if (is_wp_error($root)) { $info['message']=$root->get_error_message(); return $info; }
         $manifest=trailingslashit($root).'.gamb-static-files.json';

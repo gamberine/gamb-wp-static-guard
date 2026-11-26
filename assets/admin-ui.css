@@ -750,6 +750,12 @@
 .gamb-project-row select, .gamb-delivery-row select, .gamb-delivery-row input { width: 100%; max-width: 100%; min-width: 0; box-sizing: border-box; }
 .gamb-project-row p, .gamb-delivery-row .gamb-action-row { margin: 0; }
 .gamb-project-row p, .gamb-destination-address, .gamb-field-help { overflow-wrap: anywhere; }
+.gamb-origin-section { margin-block: 18px; padding: 16px; border: 1px solid #dce3ed; border-radius: 8px; }
+.gamb-origin-section legend { font-weight: 650; padding-inline: 6px; }
+.gamb-url-editor { display: flex; align-items: end; gap: 12px; flex-wrap: wrap; }
+.gamb-url-editor > div { flex: 1 1 320px; min-width: 0; }
+.gamb-url-editor input { width: 100%; max-width: 100%; }
+.gamb-original-settings { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
 .gamb-destination-address [data-saved-address] { display: block; }
 .gamb-admin button.gamb-badge[data-target]:not([data-target=""]) { cursor: pointer; }
 .gamb-admin button.gamb-badge[aria-disabled=true] { cursor: default; }

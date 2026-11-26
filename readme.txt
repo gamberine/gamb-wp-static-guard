@@ -4,7 +4,7 @@ Tags: static-site, export, security, local-search
 Requires at least: 6.2
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 5.4.1
+Stable tag: 5.5.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/old-licenses/gpl-2.0.html
 
@@ -37,6 +37,10 @@ Repositório, documentação e versões:
 https://github.com/gamberine/gamb-wp-static-guard
 
 == Registro de versões ==
+
+= 5.5.0 =
+* Estático principal, origens LAN isoladas e acesso WP privado com confirmação e expiração.
+* Destinos simplificados, scripts de compartilhamento e manual atualizados.
 
 = 5.4.1 =
 * Reorganiza os controles administrativos e abre a aba correspondente a cada alerta.
