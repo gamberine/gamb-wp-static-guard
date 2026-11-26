@@ -32,7 +32,7 @@ final class Gamb_Static_Sanitizer {
         foreach (Gamb_DOM_Parser::elements($document) as $element) {
             $tag = strtolower($element->tagName);
             if (('script' === $tag && 'speculationrules' === strtolower(Gamb_DOM_Parser::attribute($element, 'type'))) || ('style' === $tag && preg_match('/^(wp-|global-styles|classic-theme|core-block)/i', Gamb_DOM_Parser::attribute($element, 'id')) && !in_array(Gamb_DOM_Parser::attribute($element, 'id'), $allowed, true)) || ('meta' === $tag && 'generator' === strtolower(Gamb_DOM_Parser::attribute($element, 'name'))) || ('link' === $tag && preg_match('/(?:^|\s)(?:EditURI|wlwmanifest|shortlink)(?:\s|$)/i', Gamb_DOM_Parser::attribute($element, 'rel')))) {
-                $element->parentNode?->removeChild($element); continue;
+                if ($element->parentNode !== null) { $element->parentNode->removeChild($element); } continue;
             }
             if ($element->hasAttribute('class')) {
                 $classes = array_filter(preg_split('/\s+/', trim(Gamb_DOM_Parser::attribute($element, 'class'))) ?: array(), static fn(string $class): bool => !self::native_class($class));

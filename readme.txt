@@ -3,8 +3,8 @@ Contributors: gamberine
 Tags: static-site, export, security, local-search
 Requires at least: 6.2
 Tested up to: 7.1
-Requires PHP: 8.1
-Stable tag: 5.4.0
+Requires PHP: 7.4
+Stable tag: 5.4.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/old-licenses/gpl-2.0.html
 
@@ -37,6 +37,12 @@ Repositório, documentação e versões:
 https://github.com/gamberine/gamb-wp-static-guard
 
 == Registro de versões ==
+
+= 5.4.1 =
+* Reorganiza os controles administrativos e abre a aba correspondente a cada alerta.
+* Usa a instalação como base do destino padrão e exige HTTPS para destinos externos.
+Backup de banco, tema e extensões com PclZip do WordPress e zlib quando
+ZIP nativo estiver indisponível. Diagnóstico atualizado.
 
 = 5.4.0 =
 Auditoria defensiva da entrega e do destino, referência parcial ao OWASP ASVS,

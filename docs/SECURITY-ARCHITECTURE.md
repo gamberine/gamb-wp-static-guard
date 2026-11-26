@@ -16,7 +16,7 @@ Os relatórios armazenam códigos de regras e fontes reduzidas, sem copiar o tre
 
 ## Parser e preservação de conteúdo
 
-No PHP 8.4, `Dom\HTMLDocument::createFromString` interpreta HTML5. No PHP 8.1 a 8.3, `DOMDocument` usa erros libxml internos, bloqueio de rede e `mb_encode_numericentity`, sem a conversão depreciada HTML-ENTITIES. Não são habilitados expansão de entidades nem carregamento de DTD externo.
+No PHP 8.4, `Dom\HTMLDocument::createFromString` interpreta HTML5. Do PHP 7.4 ao 8.3, `DOMDocument` usa erros libxml internos, bloqueio de rede e `mb_encode_numericentity`, sem a conversão depreciada HTML-ENTITIES. Não são habilitados expansão de entidades nem carregamento de DTD externo.
 
 O conteúdo raw-text de script e style é preservado durante a conversão e serialização para que caracteres Unicode não sejam transformados em entidades dentro do código executável. A normalização tipográfica aplica-se a textos e atributos textuais; URLs, CSS e handlers conservam sua semântica. Os arquivos PHP distribuídos usam strict_types e propriedades declaradas.
 

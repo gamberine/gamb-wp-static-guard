@@ -2,6 +2,16 @@
 
 Este documento distingue a incorporação histórica das novas alterações. As datas correspondem ao registro verificável, sem reconstruir datas de commits inexistentes.
 
+## 5.4.1 - 2026-11-25
+
+- Restaurar a compatibilidade com PHP 7.4 e incluir essa vers?o na matriz de CI.
+
+- Reorganizar o painel de destino, manter a ação de salvar disponível e vincular alertas às abas de diagnóstico e auditoria.
+- Usar a URL da instalação como base do destino padrão, bloquear o domínio pai e impedir caminhos acima da instalação no mesmo host. Exigir HTTPS em destinos externos.
+
+- Usar o PclZip do WordPress com zlib para o backup de banco, tema e extensões quando a extensão ZIP do PHP estiver indisponível.
+- Atualizar o diagnóstico para indicar o suporte ao backup completo. O backup apenas do banco continua disponível em SQL sem ZIP nativo.
+
 ## 5.4.0 - 2026-11-24
 
 - Adicionar a aba Auditoria com verificações defensivas de leitura da última entrega local e de até quatro URLs derivadas do destino salvo, sem redirecionamentos ou entrada de URLs arbitrárias.

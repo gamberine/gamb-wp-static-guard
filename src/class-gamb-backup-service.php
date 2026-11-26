@@ -132,11 +132,27 @@ class Backup_Service {
 		return $table_count;
 	}
 
+	public static function zip_backend(): string {
+		if ( class_exists( '\ZipArchive' ) ) {
+			return 'native';
+		}
+		if ( function_exists( 'gzopen' ) && function_exists( 'gzdeflate' ) ) {
+			$core_zip = @fopen( ABSPATH . 'wp-admin/includes/class-pclzip.php', 'rb' );
+			if ( $core_zip ) {
+				fclose( $core_zip );
+				return 'pclzip';
+			}
+		}
+		return '';
+	}
+
 	public static function create_backup( $type = "full" ) {
 		$lock = @fopen( get_temp_dir() . 'gamb-backup-' . md5( ABSPATH ) . '.lock', 'c' );
 		if ( ! $lock || ! flock( $lock, LOCK_EX | LOCK_NB ) ) { if ( $lock ) { fclose( $lock ); } return new \WP_Error( 'backup_busy', 'Outra cópia de segurança está em andamento.' ); }
 		try {
-			if ( 'full' === $type && ! class_exists( '\\ZipArchive' ) ) { return new \WP_Error( 'zip_required', 'O pacote de banco, tema e extensões requer a extensão ZIP.' ); }
+			if ( 'full' === $type && '' === self::zip_backend() ) {
+				return new \WP_Error( 'zip_required', 'O backup de banco, tema e extensões requer ZIP nativo ou PclZip do WordPress com zlib.', array( 'status' => 422 ) );
+			}
 			$result = self::perform_backup( $type );
 			if ( is_wp_error( $result ) ) { return $result; }
 			$path = trailingslashit( self::get_backup_dir() ) . $result['filename'];
@@ -176,7 +192,8 @@ class Backup_Service {
 			return $tables_dumped;
 		}
 
-		if ( ! class_exists( "\\ZipArchive" ) ) {
+		$backend = self::zip_backend();
+		if ( 'db' === $type && 'native' !== $backend ) {
 			$sql_name = $prefix . $date_stamp . "-" . $rand_token . ".sql";
 			$final_sql = trailingslashit( $backup_dir ) . $sql_name;
 			if ( ! @rename( $sql_path, $final_sql ) ) { return new \WP_Error( "backup_move", "Não foi possível concluir a cópia SQL." ); }
@@ -192,15 +209,6 @@ class Backup_Service {
 		}
 
 		Operation_Progress::phase('backup',2,4,0,1,'Preparando o pacote de segurança.');
-		$zip = new \ZipArchive();
-		$res = $zip->open( $zip_path, \ZipArchive::CREATE | \ZipArchive::OVERWRITE );
-		if ( true !== $res ) {
-			@unlink( $sql_path );
-			return new \WP_Error( "zip_create_error", "Não foi possível criar o arquivo ZIP de backup." );
-		}
-
-		$zip->addFile( $sql_path, "database.sql" );
-
 		$manifest = array(
 			"generator"      => "Gamb WP Static Guard",
 			"version"        => GAMB_STATIC_WP_VERSION,
@@ -215,7 +223,7 @@ class Backup_Service {
 			"active_theme"   => get_stylesheet(),
 			"active_plugins" => get_option( "active_plugins", array() ),
 		);
-		$zip->addFromString( "manifest.json", wp_json_encode( $manifest, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE ) );
+		$manifest_json = wp_json_encode( $manifest, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE );
 
 		$readme = "# Gamb WP Static Guard - Pacote de Backup (Estilo pacote de recuperação)\n\n"
 			. "Gerado em: " . current_time( "mysql" ) . "\n"
@@ -227,21 +235,37 @@ class Backup_Service {
 			. "## Como Restaurar:\n"
 			. "1. Importe `database.sql` no seu banco MySQL via phpMyAdmin ou CLI.\n"
 			. "2. Caso seja backup completo, extraia a pasta `wp-content/` na raiz da instalação WordPress.\n";
-		$zip->addFromString( "LEIA-ME-RESTAURACAO.txt", $readme );
-
-		if ( "full" === $type ) {
-			self::add_directory_to_zip( $zip, get_stylesheet_directory(), "wp-content/themes/" . get_stylesheet() );
-			if ( get_template_directory() !== get_stylesheet_directory() ) {
-				self::add_directory_to_zip( $zip, get_template_directory(), "wp-content/themes/" . get_template() );
+		$partial_path = $zip_path . '.part';
+		try {
+			if ( false === $manifest_json ) {
+				return new \WP_Error( 'backup_manifest', 'Não foi possível gerar o manifesto da cópia.' );
 			}
-			$plugins_dir = defined( "WP_PLUGIN_DIR" ) ? WP_PLUGIN_DIR : ( WP_CONTENT_DIR . "/plugins" );
-			self::add_directory_to_zip( $zip, $plugins_dir, "wp-content/plugins" );
+			$files = array( 'database.sql' => $sql_path );
+			if ( 'full' === $type ) {
+				self::collect_directory_files( $files, get_stylesheet_directory(), 'wp-content/themes/' . get_stylesheet() );
+				if ( get_template_directory() !== get_stylesheet_directory() ) {
+					self::collect_directory_files( $files, get_template_directory(), 'wp-content/themes/' . get_template() );
+				}
+				$plugins_dir = defined( 'WP_PLUGIN_DIR' ) ? WP_PLUGIN_DIR : WP_CONTENT_DIR . '/plugins';
+				self::collect_directory_files( $files, $plugins_dir, 'wp-content/plugins' );
+			}
+			$metadata = array( 'manifest.json' => $manifest_json, 'LEIA-ME-RESTAURACAO.txt' => $readme );
+			Operation_Progress::phase( 'backup', 3, 4, 0, 1, 'Compactando a cópia de segurança.' );
+			$result = self::write_zip( $backend, $partial_path, $files, $metadata );
+			if ( is_wp_error( $result ) ) {
+				return $result;
+			}
+			if ( ! is_file( $partial_path ) || ! filesize( $partial_path ) || ! @rename( $partial_path, $zip_path ) ) {
+				return new \WP_Error( 'backup_zip', 'Não foi possível concluir o pacote ZIP.' );
+			}
+		} catch ( \RuntimeException $error ) {
+			return new \WP_Error( 'backup_zip', 'Não foi possível ler os arquivos ou concluir o pacote ZIP.' );
+		} finally {
+			if ( is_file( $partial_path ) ) {
+				@unlink( $partial_path );
+			}
+			@unlink( $sql_path );
 		}
-
-		Operation_Progress::phase('backup',3,4,0,1,'Finalizando o arquivo da cópia de segurança.');
-		if (method_exists($zip,'registerProgressCallback')) { $zip->registerProgressCallback(0.02,static function($ratio) { Operation_Progress::phase('backup',3,4,(int)round($ratio*10000),10000,'Compactando a cópia de segurança.'); }); }
-		if ( ! $zip->close() ) { return new \WP_Error( "backup_zip", "Não foi possível concluir o pacote ZIP." ); }
-		@unlink( $sql_path );
 
 		$size = is_file( $zip_path ) ? (int) filesize( $zip_path ) : 0;
 
@@ -257,7 +281,7 @@ class Backup_Service {
 		);
 	}
 
-	private static function add_directory_to_zip( \ZipArchive $zip, $src_dir, $zip_prefix ) {
+	private static function collect_directory_files( array &$files, $src_dir, $zip_prefix ) {
 		if ( ! is_dir( $src_dir ) ) {
 			return;
 		}
@@ -281,8 +305,69 @@ class Backup_Service {
 			if ( $skip ) {
 				continue;
 			}
-			$zip->addFile( $path, $zip_prefix . "/" . $rel );
+			$files[ $zip_prefix . '/' . $rel ] = $path;
 		}
+	}
+
+	private static function write_zip( string $backend, string $path, array $files, array $metadata ) {
+		$error = new \WP_Error( 'backup_zip', 'Não foi possível gerar um pacote ZIP com todos os arquivos da cópia.' );
+		if ( 'native' === $backend ) {
+			$zip = new \ZipArchive();
+			if ( true !== $zip->open( $path, \ZipArchive::CREATE | \ZipArchive::OVERWRITE ) ) {
+				return $error;
+			}
+			$complete = true;
+			foreach ( $files as $name => $file ) {
+				$complete = $zip->addFile( $file, $name ) && $complete;
+			}
+			foreach ( $metadata as $name => $contents ) {
+				$complete = $zip->addFromString( $name, $contents ) && $complete;
+			}
+			if ( method_exists( $zip, 'registerProgressCallback' ) ) {
+				$zip->registerProgressCallback( 0.02, static function ( $ratio ) {
+					Operation_Progress::phase( 'backup', 3, 4, (int) round( $ratio * 10000 ), 10000, 'Compactando a cópia de segurança.' );
+				} );
+			}
+			return $zip->close() && $complete ? true : $error;
+		}
+
+		require_once ABSPATH . 'wp-admin/includes/class-pclzip.php';
+		$zip = new \PclZip( $path );
+		$entries = array();
+		$expected_sizes = array();
+		// PclZip uses ZIP32 and holds individual files in memory.
+		$limit = wp_convert_hr_to_bytes( ini_get( 'memory_limit' ) );
+		$total = 0;
+		$largest = 0;
+		foreach ( $files as $name => $file ) {
+			$size = @filesize( $file );
+			if ( false === $size ) {
+				return $error;
+			}
+			$total += $size;
+			$largest = max( $largest, $size );
+			$expected_sizes[ $name ] = $size;
+			$entries[] = array( PCLZIP_ATT_FILE_NAME => $file, PCLZIP_ATT_FILE_NEW_FULL_NAME => $name );
+		}
+		foreach ( $metadata as $name => $contents ) {
+			$expected_sizes[ $name ] = strlen( $contents );
+			$entries[] = array( PCLZIP_ATT_FILE_NAME => $name, PCLZIP_ATT_FILE_CONTENT => $contents );
+		}
+		if ( count( $entries ) >= 65535 || $total >= 2000000000 || ( $limit > 0 && $largest > ( $limit - memory_get_usage( true ) ) / 4 ) ) {
+			return new \WP_Error( 'backup_zip_limit', 'Os arquivos excedem o limite de compactação do PclZip ou da memória do PHP. Habilite a extensão ZIP e tente novamente.' );
+		}
+		$result = $zip->create( $entries, PCLZIP_OPT_TEMP_FILE_OFF );
+		if ( ! is_array( $result ) || count( $result ) !== count( $expected_sizes ) ) {
+			return $error;
+		}
+		foreach ( $result as $entry ) {
+			$name = $entry['stored_filename'];
+			if ( 'ok' !== $entry['status'] || ! isset( $expected_sizes[ $name ] ) || $entry['size'] !== $expected_sizes[ $name ] ) {
+				return $error;
+			}
+			unset( $expected_sizes[ $name ] );
+		}
+		return empty( $expected_sizes ) ? true : $error;
 	}
 
 	public static function list_backups() {
@@ -349,9 +434,12 @@ class Backup_Service {
 			),
 			array(
 				"category" => "Ambiente & Servidor",
-				"label"    => "Extensão ZipArchive",
-				"ok"       => class_exists( "\\ZipArchive" ),
-				"detail"   => class_exists( "\\ZipArchive" ) ? "Ativa para geração de pacotes estáticos e backups." : "Ausente (usando fallback SQL/PclZip).",
+				"label"    => "Suporte ZIP",
+				"ok"       => '' !== self::zip_backend(),
+				"detail"   => array(
+					'native' => "Extensão ZIP nativa disponível.",
+					'pclzip' => "PclZip disponível para o backup completo. O backup de banco é gerado em SQL.",
+				)[self::zip_backend()] ?? "Habilite ZIP ou zlib para gerar pacotes de backup.",
 			),
 			array(
 				"category" => "1. STATIC - Diretórios",

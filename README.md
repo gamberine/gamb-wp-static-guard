@@ -4,9 +4,12 @@
 
 Extensão para WordPress destinada à geração de sites estáticos, à publicação em diretório local ou arquivo ZIP e à redução da exposição de informações técnicas na saída pública.
 
-**Versão de referência:** 5.4.0. **Licença:** GPL-2.0-or-later. **Manutenção:** [gamberine](https://github.com/gamberine).
+**Versão de referência:** 5.4.1. **Licença:** GPL-2.0-or-later. **Manutenção:** [gamberine](https://github.com/gamberine).
 
 ## Manual de uso
+
+- [Manual interativo no repositório](https://github.com/gamberine/gamb-wp-static-guard/blob/main/assets/docs/manual.html)
+- [Notas e pacotes da versão](https://github.com/gamberine/gamb-wp-static-guard/releases/tag/v5.4.1)
 
 A fonte oficial do [manual interativo](assets/docs/manual.html) fica neste repositório e acompanha o pacote do plugin. Na instalação, acesse `ajuda/publicacao-estatica/`, relativa à URL principal do site, ou o botão **Manual** do painel.
 
@@ -14,7 +17,7 @@ O manual deve ser atualizado junto de cada alteração de função, campo, menu 
 
 ## Finalidade e limites
 
-A versão 5 requer PHP 8.1 ou superior. No PHP 8.1 a 8.3, as extensões DOM e mbstring são necessárias para o parser; no PHP 8.4 ou superior, o parser HTML5 nativo é utilizado quando disponível. A validação automatizada cobre PHP 8.1, 8.2, 8.3 e 8.4, sem presumir compatibilidade irrestrita com futuras versões. Consulte a [arquitetura de segurança e atualização](docs/SECURITY-ARCHITECTURE.md) antes da migração.
+A versão 5 requer PHP 8.1 ou superior. No PHP 8.1 a 8.3, as extensões DOM e mbstring são necessárias para o parser; no PHP 8.4 ou superior, o parser HTML5 nativo é utilizado quando disponível. A validação automatizada inclui PHP 7.4, 8.1, 8.2, 8.3 e 8.4, sem presumir compatibilidade irrestrita com futuras versões. Consulte a [arquitetura de segurança e atualização](docs/SECURITY-ARCHITECTURE.md) antes da migração.
 
 O componente **Static** consulta páginas públicas, reúne recursos e produz HTML, CSS, JavaScript, documentos e um índice de pesquisa local. O componente **Guard** reescreve caminhos de recursos, aplica controles configuráveis à saída e valida o HTML antes da entrega.
 

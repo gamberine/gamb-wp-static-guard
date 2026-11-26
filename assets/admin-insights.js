@@ -34,12 +34,46 @@
       var nav=root.querySelector('[data-navigation-list]');nav.replaceChildren();(dep.external_navigation||[]).forEach(function(url){nav.appendChild(node('li',url));});nav.appendChild(node('li',(dep.external_navigation||[]).length?'Lista limitada a '+(dep.navigation_limit||200)+' endereços; parâmetros sensíveis são omitidos.':'O relatório anterior não contém a lista de URLs. Execute novamente o diagnóstico ou a publicação.'));
       root.querySelectorAll('[data-report-download]').forEach(function(a){a.href=d.downloads[a.dataset.reportDownload];a.removeAttribute('aria-disabled');});root.querySelector('[data-run-publication-audit]').disabled=p.method!=='local';files(p);proposed();return d;
     });}
-    function proposed(){var get=function(k){return root.querySelector('[data-opt="'+k+'"]').value;},host=get('destination_host').trim().replace(/^https?:\/\//i,'').replace(/\/+$/,''),prefix=get('relative_path').replace(/^\/+|\/+$/g,'');put('[data-proposed-url]',host?'Endereço proposto: '+get('destination_scheme')+host+(prefix&&!host.endsWith('/'+prefix)?'/'+prefix:'')+'/ · Salve para aplicar.':'Informe o domínio público para conferir o endereço proposto.');}
-    ['destination_host','relative_path','destination_scheme','destination_url_type'].forEach(function(k){root.querySelector('[data-opt="'+k+'"]').addEventListener('input',proposed);});proposed();
+    var projectButton=root.querySelector('[data-use-project-url]');
+    var project=new URL(projectButton.dataset.projectUrl);
+    var scheme=root.querySelector('[data-opt=destination_scheme]');
+    var hostField=root.querySelector('[data-opt=destination_host]');
+    hostField.placeholder=project.host;
+    function proposed(){
+      var get=function(key){return root.querySelector('[data-opt="'+key+'"]').value;};
+      var host=hostField.value.trim(), trim=function(value){return value.replace(/^\/+|\/+$/g,'');};
+      var savedBox=root.querySelector('[data-saved-address]');
+      var savedUrl=savedBox.querySelector('a').textContent.trim();
+      var url, invalid;
+      try{
+        var rawHost=host.split('/')[0];
+        var target=new URL('https://'+(rawHost||project.host));
+        var name=target.hostname.toLowerCase().replace(/\.$/,'');
+        var projectHost=project.hostname.toLowerCase().replace(/\.$/,'');
+        var local=/^(localhost|\[::1\]|127\.\d+\.\d+\.\d+)$|\.(?:localhost|local|test)$/.test(name);
+        scheme.querySelector('[value="http://"]').disabled=!local;
+        if(!local)scheme.value='https://';
+        var homePath=trim(project.pathname), hostPath=trim(host.slice(rawHost.length));
+        var relative=trim(get('relative_path'));
+        if(!host&&!relative&&get('delivery_method')==='local')relative=encodeURIComponent(trim(path.value.replace(/\\/g,'/')).split('/').pop());
+        var publicPath=hostPath||relative;
+        if(name!==projectHost&&projectHost.endsWith('.'+name))throw Error('Use o subdomínio da instalação.');
+        if(name===projectHost&&homePath&&publicPath!==homePath&&!publicPath.startsWith(homePath+'/')){
+          if(hostPath)throw Error('Use um caminho dentro da instalação.');
+          publicPath=homePath+(publicPath?'/'+publicPath:'');
+        }
+        url=scheme.value+name+(target.port?':'+target.port:'')+'/'+(publicPath?publicPath+'/':'');
+      }catch(error){invalid=error.message;}
+      var changed=Boolean(url&&savedUrl&&url!==savedUrl);
+      savedBox.hidden=!changed;
+      put('[data-proposed-url]',invalid||(changed?'Endereço proposto: '+url+' · Salve para aplicar.':'Endereço público: '+url));
+    }
+    ['destination_host','relative_path','destination_scheme','delivery_method','local_dir'].forEach(function(key){root.querySelector('[data-opt="'+key+'"]').addEventListener('input',proposed);});
+    proposed();
     function invalidate(){create.hidden=true;create.disabled=true;put('[data-destination-result]','Caminho alterado. Verifique a pasta antes de salvar.');}
     root.querySelector('[data-use-project-url]').addEventListener('click',function(){var u=new URL(this.dataset.projectUrl);root.querySelector('[data-opt=destination_host]').value=u.host;root.querySelector('[data-opt=destination_scheme]').value=u.protocol+'//';root.querySelector('[data-opt=relative_path]').value=u.pathname.replace(/^\/+|\/+$/g,'');root.querySelector('[data-opt=destination_url_type]').value='relative';proposed();});
-    path.addEventListener('input',invalidate);root.querySelector('[data-destination-suggest]').addEventListener('click',function(){path.value=api.config.suggestedDirectory;invalidate();});
-    function destination(make){var requested=path.value;return api.task('destination','destination',{path:requested,create:make},function(d){if(path.value!==requested)return;path.value=d.path;put('[data-destination-result]',d.message+' Caminho: '+d.path);create.hidden=!d.can_create;create.disabled=!d.can_create;},function(e){if(path.value===requested){create.hidden=true;create.disabled=true;put('[data-destination-result]','Pasta recusada: '+e.message);}});}
+    path.addEventListener('input',invalidate);root.querySelector('[data-destination-suggest]').addEventListener('click',function(){path.value=api.config.suggestedDirectory;invalidate();proposed();});
+    function destination(make){var requested=path.value;return api.task('destination','destination',{path:requested,create:make},function(d){if(path.value!==requested)return;path.value=d.path;proposed();put('[data-destination-result]',d.message+' Caminho: '+d.path);create.hidden=!d.can_create;create.disabled=!d.can_create;},function(e){if(path.value===requested){create.hidden=true;create.disabled=true;put('[data-destination-result]','Pasta recusada: '+e.message);}});}
     root.querySelector('[data-destination-check]').addEventListener('click',function(){destination(false);});create.addEventListener('click',function(){destination(true);});
     root.querySelector('[data-run-publication-audit]').addEventListener('click',function(){api.task('publication-audit','publication-audit',{},function(){return refresh(1);});});
     root.querySelectorAll('[data-open-panel]').forEach(function(b){b.addEventListener('click',function(){var tab=root.querySelector('[data-tab="'+b.dataset.openPanel+'"]');api.select(tab,true);root.querySelector('#'+tab.getAttribute('aria-controls')).focus({preventScroll:true});});});

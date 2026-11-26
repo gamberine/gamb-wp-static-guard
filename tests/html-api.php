@@ -68,7 +68,7 @@ $fixture = sys_get_temp_dir() . '/gamb-integrity-' . bin2hex( random_bytes( 8 ) 
 mkdir( $fixture . '/v', 0777, true );
 try {
     file_put_contents( $fixture . '/v/fixture_asset', 'body{color:#123456}' );
-    $integrity_html = '<html><head><link rel="stylesheet" href="/preview/v/fixture_asset" integrity="old"></head><body><script src="https://remote.test/v/fixture_asset" integrity="external"></script><script src="//remote.test/v/fixture_asset" integrity="external-relative"></script></body></html>';
+    $integrity_html = '<html><head><link rel="stylesheet" href="/site/preview/v/fixture_asset" integrity="old"></head><body><script src="https://remote.test/v/fixture_asset" integrity="external"></script><script src="//remote.test/v/fixture_asset" integrity="external-relative"></script></body></html>';
     $integrity_html = \GambWPStaticGuard\Installation_Checks::refresh_integrity( $integrity_html, $fixture );
     expect( strpos( $integrity_html, 'sha384-' . base64_encode( hash( 'sha384', 'body{color:#123456}', true ) ) ) !== false, 'Calcular SRI sobre os bytes finais.' );
     expect( strpos( $integrity_html, 'integrity="external"' ) !== false && strpos( $integrity_html, 'integrity="external-relative"' ) !== false, 'Não substituir SRI de recursos de outra origem.' );

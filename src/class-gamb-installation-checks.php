@@ -263,7 +263,11 @@ class Installation_Checks {
         $add( 'html_parser', $parser_available ? 'ok' : 'error', $native_parser ? 'Parser HTML5 nativo disponível.' : ( $parser_available ? 'Parser DOMDocument e mbstring disponíveis.' : 'Habilite DOM e mbstring para a sanitização e auditoria desta versão do PHP.' ) );
         $hash_available = function_exists( 'hash_hmac' ) && in_array( 'sha256', hash_algos(), true );
         $add( 'crypto', $hash_available ? 'ok' : 'error', $hash_available ? 'HMAC SHA-256 disponível para validação dos tokens.' : 'HMAC SHA-256 indisponível; os tokens de recursos não podem ser validados.' );
-        $add( 'zip', class_exists( '\ZipArchive' ) ? 'ok' : 'warning', class_exists( '\ZipArchive' ) ? 'Extensão ZIP disponível.' : 'ZIP nativo indisponível: a exportação estática usa a alternativa do WordPress; o backup de banco com tema e extensões requer ZIP.' );
+		$zip_backend = Backup_Service::zip_backend();
+		$add( 'zip', '' !== $zip_backend ? 'ok' : 'warning', array(
+			'native' => 'Extensão ZIP disponível.',
+			'pclzip' => 'PclZip do WordPress disponível para exportação estática e backup de banco, tema e extensões.',
+		)[$zip_backend] ?? 'ZIP nativo e alternativa do WordPress indisponíveis. Habilite ZIP ou zlib para gerar pacotes ZIP.' );
         $types = array_diff( get_post_types( array( 'public' => true ), 'names' ), array( 'attachment' ) );
         $add( 'post_types', 'ok', 'Tipos públicos disponíveis: ' . implode( ', ', $types ) . '.' );
         $add( 'first_export', 'ok', Options::instance()->get( 'first_full_export_completed', false ) ? 'Primeira publicação completa já concluída.' : 'A primeira publicação será completa; os outros escopos serão liberados após a entrega.' );

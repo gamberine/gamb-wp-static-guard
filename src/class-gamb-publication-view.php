@@ -12,9 +12,8 @@ final class Publication_View {
         if(($settings['delivery_method']??'')!=='local')return 'A apresentação estática na raiz requer entrega local.';
         foreach(array('destination_scheme','destination_host','relative_path')as$key){if(!is_string($settings[$key]??''))return 'Valor de destino invalido.';}
         $home=Destination_Audit::base(home_url('/'));
-        $base=($settings['destination_scheme']??'https://').($settings['destination_host']??'');
-        $hostPath=wp_parse_url($base,PHP_URL_PATH);
-        if(!$hostPath||$hostPath==='/')$base=rtrim($base,'/').'/'.trim((string)($settings['relative_path']??''),'/');
+        try { $base = Static_Engine::resolve_public_base($settings); }
+        catch (\RuntimeException $error) { return $error->getMessage(); }
         if(Destination_Audit::base($base)!==$home)return 'Para apresentar o estático na raiz, use a URL principal do projeto como destino. Clique em Usar endereço local do projeto.';
         if(($settings['destination_url_type']??'')==='offline')return 'Use endereços relativos ao domínio ou absolutos para apresentar o estático na raiz.';
         return null;
@@ -30,7 +29,7 @@ final class Publication_View {
         $meta=json_decode((string)file_get_contents($receipt),true);
         if(!is_array($meta)||($meta['public_url']??'')!==Destination_Audit::base(home_url('/'))||($meta['environment']??'')!==($o['destination_environment']??'production')){$result['message']='A entrega existente pertence a outro destino/ambiente. Reexporte antes de apresentar o estático.';return $result;}
         $files=json_decode((string)file_get_contents($manifest),true);
-        if(!is_array($files)||!array_is_list($files)||count($files)>20000||!in_array('index.html',$files,true)||!self::resolve($root,'index.html')){$result['message']='Home ou manifesto da entrega indisponível.';return $result;}
+        if(!is_array($files)||array_values($files)!==$files||count($files)>20000||!in_array('index.html',$files,true)||!self::resolve($root,'index.html')){$result['message']='Home ou manifesto da entrega indisponível.';return $result;}
         $result['ready']=true;$result['message']='A URL principal apresenta os arquivos estáticos da última entrega. WordPress permanece disponível no admin e na captura assinada.';return $result;
     }
     public static function resolve(string $root,string $relative): ?string {

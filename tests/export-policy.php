@@ -18,6 +18,16 @@ if (!function_exists('current_user_can')) {
         expect(ExportGuard::is_public_asset('manifest.json') && ExportGuard::is_public_asset('library.mjs'),'Preservar recursos públicos e manifestos de execução.');
         expect(ExportGuard::asset_mime_types()['docx']==='application/vnd.openxmlformats-officedocument.wordprocessingml.document','DOCX usa o mesmo MIME no handler e na publicação.');
         $guard=ExportGuard::get_instance();
+        expect(ExportEngine::resolve_public_base(array('delivery_method'=>'local','local_dir'=>'/srv/preview'))==='https://example.test/site/preview/','Derivar o endereço da instalação e da pasta.');
+        expect(ExportEngine::resolve_public_base(array('destination_host'=>'example.test/site','relative_path'=>'site'))==='https://example.test/site/','Preservar a raiz sem duplicar o caminho.');
+        expect(ExportEngine::resolve_public_base(array('destination_host'=>'public.example.org','destination_scheme'=>'http://'))==='https://public.example.org/','Forçar HTTPS externo.');
+        expect(ExportEngine::resolve_public_base(array('destination_host'=>'localhost:8080','destination_scheme'=>'http://'))==='http://localhost:8080/','Permitir HTTP local.');
+        foreach (array('test','example.test/other','example.test/site/%2e%2e') as $invalid) {
+            $blocked = false;
+            try { ExportEngine::resolve_public_base(array('destination_host'=>$invalid)); }
+            catch (\RuntimeException $error) { $blocked = true; }
+            expect($blocked,'Bloquear domínio pai ou caminho fora da instalação.');
+        }
         $options->set('guard_hide_theme_identity',true);
         $literal='const sample="//# sourceMappingURL=literal.map";';
         expect($guard->sanitize_js_content($literal)===$literal,'Preservar texto semelhante a comentário dentro de strings JS.');
