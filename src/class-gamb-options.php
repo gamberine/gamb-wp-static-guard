@@ -8,7 +8,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 /**
- * Gamb WP Static Guard - Gerenciador Central de Opções e Perfil Padrão Seguro (v5.5.0).
+ * Gamb WP Static Guard - Gerenciador Central de Opções e Perfil Padrão Seguro (v5.5.1).
  *
  * Mantém compatibilidade com a chave 'gamb-wp-static-guard' no wp_options e separa claramente
  * as configurações de 1. STATIC (Conversão & Publicação) e 2. GUARD (Ocultação & Segurança).
@@ -17,7 +17,7 @@ class Options {
 
 	const OPTION_KEY  = 'gamb_wp_static_guard';
 	const VERSION_KEY = 'gamb_wp_static_guard_profile_version';
-	const VERSION     = '5.5.0';
+	const VERSION     = '5.5.1';
 
 	private static $instance = null;
 	private $options = array();

@@ -9,6 +9,7 @@ use GambWPStaticGuard\Original_Access as Original;
     $server=$_SERVER;
     try {
         file_put_contents($directory.'/session.json',json_encode(array('status'=>'running','address'=>'172.30.125.118','origins'=>array('https://shared.example.test/site/'),'trusted_proxies'=>array('127.0.0.1'))));
+        Origin::state(true);
         expect(Origin::request_home(array('HTTP_HOST'=>'172.30.125.118','REMOTE_ADDR'=>'172.30.125.10'))==='http://172.30.125.118/site/','Origem LAN explicitamente autorizada preserva o caminho.');
         expect(Origin::request_home(array('HTTP_HOST'=>'172.30.125.118','REMOTE_ADDR'=>'8.8.8.8'))===null,'Não aceitar peer público em origem privada.');
         expect(Origin::request_home(array('HTTP_HOST'=>'evil.test','HTTP_X_FORWARDED_HOST'=>'example.test','HTTPS'=>'on'))===null,'Não confiar em Host ou Forwarded arbitrários.');
@@ -32,6 +33,7 @@ use GambWPStaticGuard\Original_Access as Original;
         preg_match_all('/header\(\s*["\x27]([^"\x27:]+):/',$guard,$headers);
         foreach($headers[1]as$name)expect((bool)preg_match('/^[A-Za-z0-9-]+$/D',$name),'Nomes de cabeçalhos HTTP são tokens ASCII válidos.');
         file_put_contents($directory.'/session.json',json_encode(array('status'=>'stopped','address'=>'172.30.125.118')));
+        expect(Origin::state()!==array(),'Estado consistente durante a mesma requisição.');Origin::state(true);
         expect(Origin::request_home(array('HTTP_HOST'=>'172.30.125.118','REMOTE_ADDR'=>'172.30.125.10'))===null,'Parar compartilhamento revoga alias.');
-    } finally {$_SERVER=$server;unlink($directory.'/session.json');rmdir($directory);rmdir(dirname($directory));}
+    } finally {$_SERVER=$server;unlink($directory.'/session.json');Origin::state(true);rmdir($directory);rmdir(dirname($directory));}
 })();

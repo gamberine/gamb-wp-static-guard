@@ -4,12 +4,12 @@
 
 Extensão para WordPress destinada à geração de sites estáticos, à publicação em diretório local ou arquivo ZIP e à redução da exposição de informações técnicas na saída pública.
 
-**Versão de referência:** 5.5.0. **Licença:** GPL-2.0-or-later. **Manutenção:** [gamberine](https://github.com/gamberine).
+**Versão de referência:** 5.5.1. **Licença:** GPL-2.0-or-later. **Manutenção:** [gamberine](https://github.com/gamberine).
 
 ## Manual de uso
 
 - [Manual interativo no repositório](https://github.com/gamberine/gamb-wp-static-guard/blob/main/assets/docs/manual.html)
-- [Notas e pacotes da versão](https://github.com/gamberine/gamb-wp-static-guard/releases/tag/v5.5.0)
+- [Notas e pacotes da versão](https://github.com/gamberine/gamb-wp-static-guard/releases/tag/v5.5.1)
 
 A fonte oficial do [manual interativo](assets/docs/manual.html) fica neste repositório e acompanha o pacote do plugin. Na instalação, acesse `ajuda/publicacao-estatica/`, relativa à URL principal do site, ou o botão **Manual** do painel.
 

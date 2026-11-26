@@ -2,6 +2,12 @@
 
 Este documento distingue a incorporação histórica das novas alterações. As datas correspondem ao registro verificável, sem reconstruir datas de commits inexistentes.
 
+## 5.5.1 - 2026-11-26
+
+- Gravação atômica com repetição limitada do estado de compartilhamento no Windows.
+- Uma leitura de estado por requisição, evitando contenção e mistura de origens durante parar/reiniciar.
+- Manual esclarece URL canônica estável, isolamento de cookies e Host preservado no proxy online.
+
 ## 5.5.0 - 2026-11-26
 
 - Estático como padrão para novos perfis; URL canônica salva separada das origens temporárias autorizadas.
