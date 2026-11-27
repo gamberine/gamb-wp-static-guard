@@ -19,6 +19,8 @@ if ( ! defined( "ABSPATH" ) ) {
 class Static_Engine {
 
 	private static $instance = null;
+	const UPDATE_ACTIVITY = 'gamb_static_guard_update_activity';
+	private const SCHEDULED_ACTOR = 'gamb_static_guard_scheduled_actor';
 
 	public static function get_instance() {
 		if ( null === self::$instance ) {
@@ -64,8 +66,8 @@ class Static_Engine {
 	 * @param int    $post_id ID do post quando $scope === 'single'.
 	 * @return array<string,mixed> Resultado detalhado da exportação.
 	 */
-	public function run_export( $scope = "", $post_id = 0 ) {
-		if (!Operation_Progress::active()) { return Operation_Progress::background_export(function() use ($scope,$post_id) { return $this->run_export($scope,$post_id); }); }
+	public function run_export( $scope = "", $post_id = 0, ?array $actor = null ) {
+		if (!Operation_Progress::active()) { return Operation_Progress::background_export(function() use ($scope,$post_id,$actor) { return $this->run_export($scope,$post_id,$actor); }); }
 		$lock = @fopen( get_temp_dir() . 'gamb-static-' . md5( ABSPATH ) . '.lock', 'c' );
 		if ( ! $lock || ! flock( $lock, LOCK_EX | LOCK_NB ) ) {
 			if ( $lock ) { fclose( $lock ); }
@@ -296,8 +298,15 @@ class Static_Engine {
 
 		$opts->save();
 
-		// 6. Dispara Webhook pós-publicação se configurado
-		$this->maybe_dispatch_webhook( $scope, $exported_cnt );
+		$activity = array(
+			'datetime' => $now_str,
+			'source'   => $actor['source'] ?? ('single' === $scope ? 'Editor do WordPress' : 'Painel do WordPress'),
+			'user'     => $actor['user'] ?? $this->current_user_login(),
+			'method'   => $delivery_method,
+			'files'    => $deploy_result['files'],
+		);
+		update_option(self::UPDATE_ACTIVITY, $activity, false);
+		$this->notify_publication($scope, $exported_cnt);
 
 		return array(
 			'first_full_export_completed' => (bool) $opts->get( 'first_full_export_completed', false ),
@@ -309,6 +318,7 @@ class Static_Engine {
 			"delivery_method" => $delivery_method,
 			"download_url"    => isset( $deploy_result["download_url"] ) ? $deploy_result["download_url"] : "",
 			"zip_size"        => isset( $deploy_result["size_formatted"] ) ? $deploy_result["size_formatted"] : "",
+			'update_activity' => $activity,
 			"messages"        => $opts->get( "archive_status_messages", array() ),
 			'dependency_warnings' => count( $dependency_report['dependencies'] ),
 		);
@@ -674,13 +684,14 @@ class Static_Engine {
 		if ( "local" === $method ) {
 			$local_dir = $this->validate_local_destination( $opts->get( 'local_dir', '' ) );
 			if ( is_wp_error( $local_dir ) ) { return $local_dir; }
-			if ( "" !== $local_dir && is_dir( $local_dir ) && is_writable( $local_dir ) ) {
-				if ( ! $this->copy_directory_all( $archive_dir, $local_dir ) ) {
+			if ( "" !== $local_dir && is_dir( $local_dir ) ) {
+				$changed = array();
+				if ( ! $this->copy_directory_all( $archive_dir, $local_dir, $changed ) ) {
 					return new \WP_Error( "copy_failed", "Falha ao copiar arquivos para o destino local." );
 				}
 				$manifest = $this->update_local_manifest( $archive_dir, $local_dir, $scope );
 				if ( is_wp_error( $manifest ) ) { return $manifest; }
-				return array( "delivered" => "local", "path" => $local_dir );
+				return array( "delivered" => "local", "path" => $local_dir, 'files' => $changed );
 			}
 		}
 
@@ -733,6 +744,9 @@ class Static_Engine {
 			"size"           => $size,
 			"size_formatted" => size_format( $size ),
 			"download_url"   => $dl,
+			'files'          => array_map(static function ($path) use ($archive_dir) {
+				return substr($path, strlen(wp_normalize_path($archive_dir)));
+			}, $files),
 		);
 	}
 
@@ -775,7 +789,7 @@ class Static_Engine {
 		return true;
 	}
 
-	private function copy_directory_all( $src, $dst ) {
+	private function copy_directory_all( $src, $dst, array &$changed ) {
 		$copy_total=iterator_count(new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($src,\FilesystemIterator::SKIP_DOTS))); $copied=0;
 		$base_len = strlen( rtrim( $src, "/\\" ) ) + 1;
 		$iterator = new \RecursiveIteratorIterator(
@@ -790,7 +804,12 @@ class Static_Engine {
 				$parent = realpath( dirname( $dest ) );
 				$base = trailingslashit( wp_normalize_path( realpath( $dst ) ) );
 				if ( ! $parent || is_link( $dest ) || 0 !== strpos( strtolower( trailingslashit( wp_normalize_path( $parent ) ) ), strtolower( $base ) ) ) { return false; }
+				$before = is_file($dest) ? hash_file('sha256', $dest) : false;
+				$after = hash_file('sha256', $path);
 				if ( ! @copy( $path, $dest ) ) { return false; }
+				if ($before === false || $before !== $after) {
+					$changed[] = $rel;
+				}
 				Operation_Progress::phase('export',5,6,++$copied,$copy_total,'Copiando arquivos para o destino local.');
 			}
 		}
@@ -932,13 +951,35 @@ class Static_Engine {
 		if ( ! in_array( $post->post_type, (array) ( $opts->get( 'post_types', array() ) ?: get_post_types( array( 'public' => true ), 'names' ) ), true ) ) { return; }
 		if ( $opts->get( "single_enabled", true ) && $opts->get( "auto_export", true ) && ! wp_next_scheduled( 'gamb_static_guard_auto_export_cron', array( 0 ) ) ) {
 			$delay = max( 0, (int) $opts->get( "auto_export_delay", 0 ) );
-			wp_schedule_single_event( time() + max( 2, $delay ), 'gamb_static_guard_auto_export_cron', array( 0 ) );
+			if (wp_schedule_single_event(time() + max(2, $delay), 'gamb_static_guard_auto_export_cron', array(0))) {
+				update_option(self::SCHEDULED_ACTOR, array('source' => 'Edição de conteúdo no WordPress (agendada)', 'user' => $this->current_user_login()), false);
+			}
 		}
 	}
 
 	public function run_scheduled_single_export( $post_id = 0 ) {
-		$result = $this->run_export( 'export' );
+		$actor = get_option(self::SCHEDULED_ACTOR, array());
+		delete_option(self::SCHEDULED_ACTOR);
+		$actor = is_array($actor) && $actor ? $actor : array('source' => 'Agendador do WordPress', 'user' => '');
+		$result = $this->run_export('export', 0, $actor);
 		if ( empty( $result['success'] ) ) { self::log_activity( 'Auto Push falhou: ' . $result['message'] ); }
+	}
+
+	private function current_user_login(): string {
+		return (string) wp_get_current_user()->user_login;
+	}
+
+	private function notify_publication($scope, $files_count): void {
+		$options = Options::instance();
+		if ($options->get('publication_email_enabled', false)) {
+			$recipient = $options->get('publication_email', '') ?: get_option('admin_email');
+			$subject = 'Gamb WP Static Guard — publicação concluída';
+			$message = sprintf("Endereço público: %s\nEscopo: %s\nUnidades processadas: %d", $this->public_base_url(), $scope, $files_count);
+			if (!is_email($recipient) || !wp_mail($recipient, $subject, $message)) {
+				self::log_activity('A publicação foi concluída, mas o WordPress não conseguiu enviar a notificação por e-mail.');
+			}
+		}
+		$this->maybe_dispatch_webhook($scope, $files_count);
 	}
 
 	private function maybe_dispatch_webhook( $scope, $files_count ) {
@@ -947,7 +988,7 @@ class Static_Engine {
 		if ( "" === $webhook_url || ! wp_http_validate_url( $webhook_url ) ) {
 			return;
 		}
-		wp_remote_post(
+		$response = wp_safe_remote_post(
 			$webhook_url,
 			array(
 				"timeout" => 15,
@@ -963,5 +1004,9 @@ class Static_Engine {
 				),
 			)
 		);
+		$status = is_wp_error($response) ? 0 : wp_remote_retrieve_response_code($response);
+		if ($status < 200 || $status >= 300) {
+			self::log_activity('A publicação foi concluída, mas o webhook falhou' . ($status ? ' (HTTP ' . $status . ').' : '.'));
+		}
 	}
 }

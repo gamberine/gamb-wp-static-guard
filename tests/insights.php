@@ -9,7 +9,7 @@ $sandbox=wp_normalize_path(sys_get_temp_dir()).'/gamb-insights-'.bin2hex(random_
 mkdir($sandbox);mkdir($sandbox.'/application');file_put_contents($sandbox.'/application/.env','fixture');
 try {
     foreach(array(ABSPATH,dirname(rtrim(ABSPATH,'/')),WP_CONTENT_DIR,ABSPATH.'wp-admin/new',ABSPATH.'wp-includes/new',$sandbox.'/application',$sandbox.'/../escape',$sandbox.'/CON',$sandbox.'/file:stream','//network/share',"/bad\x00path")as$blocked){expect(is_wp_error(Destination::inspect($blocked,true)),'Rejeitar destino protegido ou ambíguo: '.str_replace("\0",'',$blocked));}
-    $check=Destination::inspect($sandbox.'/publication');expect(!is_wp_error($check)&&$check['can_create']&&!is_dir($sandbox.'/publication'),'Verificação não cria a pasta.');
+    $check=Destination::inspect($sandbox.'/publication');expect(!is_wp_error($check)&&!$check['exists']&&!is_dir($sandbox.'/publication'),'Verificação não cria a pasta.');
     $created=Destination::inspect($sandbox.'/publication',true);expect(!is_wp_error($created)&&$created['created']&&is_dir($sandbox.'/publication'),'Criar somente após ação explícita.');
     expect(!is_wp_error(Destination::validate($sandbox.'/publication')),'A entrega usa a mesma validação da criação.');
     $folder=$sandbox.'/publication';$html='<!doctype html><html><head><title>Publicação</title></head><body>Conteúdo</body></html>';

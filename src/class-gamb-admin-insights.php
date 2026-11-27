@@ -45,6 +45,8 @@ final class Admin_Insights {
             'single_enabled'=>array('Disponibiliza o comando de publicação no editor. A execução reconstrói o site para manter listagens e pesquisa consistentes.','Use após atualizar uma notícia publicada.'),
             'auto_export'=>array('Agenda uma publicação após alterações em conteúdo publicado. Depende do agendador do WordPress.','Ative para automatizar a atualização após salvar uma página pública.'),
             'auto_export_delay'=>array('Espera mínima, em segundos, antes da publicação agendada. Não é uma garantia de horário exato.','60 aguarda pelo menos um minuto; 0 permite agendar sem espera adicional.'),
+            'publication_email'=>array('Destinatário da notificação de publicação. Deixe vazio para usar o e-mail administrativo do WordPress.','contato@exemplo.org'),
+            'publication_email_enabled'=>array('Envia um e-mail depois de uma publicação concluída.','Marque para receber o aviso no endereço informado.'),
             'webhook_url'=>array('Endereço opcional que recebe notificação após a publicação. Evite credenciais na URL e use apenas serviços autorizados.','Deixe vazio quando não houver integração de notificação.'),
             'refresh_local_integrity'=>array('Recalcula SHA-384 sobre os bytes finais dos estilos e scripts locais. Sem recálculo, hashes antigos incompatíveis são descartados.','Mantenha ativo para conferir os arquivos exatamente como exportados.'),
             'disable_local_integrity'=>array('Desativa explicitamente SRI local neste destino. Recursos externos preservam sua integridade. Use somente quando o CDN/proxy alterar bytes.','Deixe desmarcado em um servidor que entrega os arquivos sem transformação.'),

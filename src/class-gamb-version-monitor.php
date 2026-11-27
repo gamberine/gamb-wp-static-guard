@@ -86,6 +86,10 @@ class Version_Monitor {
     }
     public static function status(): array {
         $options=Options::instance();
-        return array('enabled'=>(bool)$options->get('version_monitor_enabled',false),'url'=>rest_url('gamb-wp-static-guard/v1/wordpress-version'),'legacy_url'=>rest_url('monitor-versao-wp'),'check_url'=>rest_url('monitor-versao-wp/check'),'peer'=>sanitize_text_field($_SERVER['REMOTE_ADDR'] ?? ''),'allowed'=>self::permission()===true,'wordpress_version'=>get_bloginfo('version'));
+        $url = static function (string $route): string {
+            $address = rest_url($route);
+            return class_exists(Origin_Context::class) ? Origin_Context::map($address) : $address;
+        };
+        return array('enabled'=>(bool)$options->get('version_monitor_enabled',false),'url'=>$url('gamb-wp-static-guard/v1/wordpress-version'),'legacy_url'=>$url('monitor-versao-wp'),'check_url'=>$url('monitor-versao-wp/check'),'peer'=>sanitize_text_field($_SERVER['REMOTE_ADDR'] ?? ''),'allowed'=>self::permission()===true,'wordpress_version'=>get_bloginfo('version'));
     }
 }

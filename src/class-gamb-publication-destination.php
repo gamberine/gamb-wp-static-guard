@@ -11,9 +11,11 @@ final class Publication_Destination {
         $path=wp_normalize_path(trim($value));
         if (preg_match('~:~',preg_replace('~^[A-Za-z]:~','',$path)) || preg_match('~(?:^|/)(?:CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])(?:\.|/|$)~i',$path)) { return new \WP_Error('invalid_local','O caminho contém um nome reservado ou um fluxo alternativo de arquivo.'); }
         if (''===$path || preg_match('~[\x00-\x1f<>"|?*]|(?:^|/)\.{1,2}(?:/|$)|[. ](?:/|$)~',$path) || str_starts_with($path,'//') || !preg_match('~^(?:[A-Za-z]:/|/)~',$path)) { return new \WP_Error('invalid_local','Use um caminho absoluto, sem atalhos, segmentos de navegação, links de rede ou caracteres de controle.'); }
-        $path=rtrim($path,'/'); $ancestor=$path; $missing=array();
+        $path=rtrim($path,'/');
+        if ($path === '' || preg_match('~^[A-Za-z]:$~D', $path)) { return new \WP_Error('unsafe_local','A raiz do disco é protegida.'); }
+        $ancestor=$path; $missing=array();
         while (!file_exists($ancestor) && !is_link($ancestor)) {
-            $parent=dirname($ancestor); if ($parent===$ancestor || '.'===$parent) { return new \WP_Error('invalid_local','O caminho não possui uma pasta existente acessível.'); }
+            $parent=wp_normalize_path(dirname($ancestor)); if ($parent===$ancestor || '.'===$parent) { return new \WP_Error('invalid_local','O caminho não possui uma pasta existente acessível.'); }
             array_unshift($missing,basename($ancestor)); $ancestor=$parent;
         }
         $real=realpath($ancestor);
@@ -29,16 +31,31 @@ final class Publication_Destination {
         if(!$audit_read_only){foreach (array('wp-config.php','wp-load.php','.git','.env') as $marker) { if (file_exists($resolved.'/'.$marker)) { return new \WP_Error('unsafe_local','Esta pasta contém uma aplicação. Selecione uma pasta exclusiva para o site estático.'); } }}
         $exists=!$missing; $writable=is_writable($real);
         if ($create && !$exists) {
-            if (!$writable || realpath($ancestor)!==$real || !wp_mkdir_p($resolved)) { return new \WP_Error('local_create_failed','Não foi possível criar a pasta. Confira as permissões do servidor.'); }
+            if (realpath($ancestor)!==$real || !wp_mkdir_p($resolved)) { return new \WP_Error('local_create_failed','Não foi possível criar a pasta. Confira as permissões do servidor.'); }
             clearstatcache(); $checked=self::inspect($resolved);
             if (is_wp_error($checked)) { return $checked; }
+            if (!$checked['exists'] || !self::can_write($checked)) {
+                return new \WP_Error('local_create_failed','A pasta criada não pôde ser validada para gravação.');
+            }
+            $checked['writable']=true;
             $checked['created']=true; $checked['message']='Pasta criada e validada. Salve as configurações para usá-la.'; return $checked;
         }
         return array('path'=>$resolved,'exists'=>$exists,'writable'=>$writable,'can_create'=>!$exists && $writable,'created'=>false,'message'=>$exists?($writable?'Pasta existente, gravável e fora das áreas protegidas.':'Pasta existente, sem permissão de gravação.'):($writable?'Pasta inexistente. Ela pode ser criada pelo botão Criar pasta.':'A pasta não existe e o diretório superior não é gravável.'));
     }
+    /** O PHP no Windows pode negar a sondagem de ACL mesmo quando a escrita é permitida. */
+    private static function can_write(array $directory): bool {
+        if ($directory['writable']) { return true; }
+        if (DIRECTORY_SEPARATOR !== '\\') { return false; }
+        $path = trailingslashit($directory['path']) . '.gamb-write-' . bin2hex(random_bytes(12)) . '.tmp';
+        $handle = @fopen($path, 'xb');
+        if ($handle === false) { return false; }
+        fclose($handle);
+        return @unlink($path);
+    }
+
     public static function validate($path, bool $audit_read_only = false) {
         $result=self::inspect($path,false,$audit_read_only);
         if (is_wp_error($result)) { return $result; }
-        return $result['exists'] && ($audit_read_only || $result['writable']) ? $result['path'] : new \WP_Error('invalid_local',$result['message']);
+        return $result['exists'] && ($audit_read_only || self::can_write($result)) ? $result['path'] : new \WP_Error('invalid_local',$result['message']);
     }
 }

@@ -269,10 +269,15 @@ class Admin_Controller
         if (isset($params['delivery_method']) && ! in_array($params['delivery_method'], array('local', 'zip'), true)) {
             return new \WP_Error('invalid_delivery', 'Selecione entrega local ou arquivo ZIP.', array('status' => 400));
         }
-        if (($params['delivery_method']??$options->get('delivery_method'))==='local') {
-            $destination=Publication_Destination::validate($params['local_dir']??$options->get('local_dir',''));
+        $local_dir = $params['local_dir'] ?? $options->get('local_dir', '');
+        if (($params['delivery_method'] ?? $options->get('delivery_method')) === 'local' && $local_dir !== '') {
+            $destination=Publication_Destination::validate($local_dir);
             if(is_wp_error($destination)){return new \WP_Error('invalid_local',$destination->get_error_message(),array('status'=>400));}
             $params['local_dir']=$destination;
+        }
+        if (isset($params['publication_email']) && (!is_string($params['publication_email']) ||
+            ($params['publication_email'] !== '' && !is_email($params['publication_email'])))) {
+            return new \WP_Error('invalid_email', 'Informe um e-mail válido para a notificação.', array('status'=>400));
         }
         if(isset($params['destination_url_type'])&&!in_array($params['destination_url_type'],array('relative','absolute','offline'),true))return new \WP_Error('invalid_url_type','Formato de endereços inválido.',array('status'=>400));
         try {
@@ -467,7 +472,6 @@ class Admin_Controller
                             <button type="button" class="button" data-tab="updates" aria-controls="panel-updates" aria-pressed="false">Atualizações do plugin</button>
                             <button type="button" class="button" data-tab="audit" aria-controls="panel-audit" aria-pressed="false">Configuração da auditoria</button>
                             <button type="button" class="button" data-tab="monitor" aria-controls="panel-monitor" aria-pressed="false">Monitor da versão WP</button>
-                            <button type="button" class="button" data-tab="monitor-query" aria-controls="panel-monitor-query" aria-pressed="false">Consultas do monitor</button>
                             <button type="button" class="button" data-tab="backup" aria-controls="panel-backup" aria-pressed="false">Gerenciador de backups</button>
                         </nav>
                     </details>
@@ -521,6 +525,16 @@ class Admin_Controller
                     </section>
                     <section class="gamb-panel" id="panel-activity" hidden>
                         <h2>Registro de atividades</h2>
+                        <section class="gamb-update-activity">
+                            <h3>Atividade de atualização</h3>
+                            <p class="gamb-help">Arquivos da última entrega e origem que iniciou a publicação.</p>
+                            <?php $activity = get_option(Static_Engine::UPDATE_ACTIVITY, array()); ?>
+                            <p data-update-activity-summary><?php echo esc_html($activity ? implode(' · ', array($activity['datetime'], $activity['source'], $activity['user'] ?: 'Usuário indisponível')) : 'Nenhuma atualização registrada.'); ?></p>
+                            <details data-update-activity-files <?php if (!$activity) echo 'hidden'; ?>>
+                                <summary><?php echo esc_html(($activity['method'] ?? '') === 'zip' ? 'Arquivos incluídos no ZIP' : 'Arquivos incluídos ou alterados'); ?> (<?php echo count($activity['files'] ?? array()); ?>)</summary>
+                                <ul><?php foreach ($activity['files'] ?? array() as $file) : ?><li><?php echo esc_html($file); ?></li><?php endforeach; ?></ul>
+                            </details>
+                        </section>
                         <div id="gamb-activity-log-box"><?php foreach ((array) $options['archive_status_messages'] as $entry) : ?><p><?php echo esc_html(($entry['datetime'] ?? '') . ' - ' . ($entry['message'] ?? '')); ?></p><?php endforeach; ?></div>
                     </section>
                     <section class="gamb-panel" id="panel-diagnostics" hidden aria-labelledby="gamb-diagnostics-heading">
@@ -545,16 +559,16 @@ class Admin_Controller
                     <section class="gamb-panel" id="panel-settings" data-settings-panel hidden>
                         <h2>Destino e endereços</h2>
                         <div class="gamb-callout gamb-project-mode">
-                            <div class="gamb-project-row"><div><label class="gamb-field" for="gamb-public-site-mode">O que abrir na URL principal do projeto</label>
+                            <div class="gamb-project-row"><div><label class="gamb-field" for="gamb-public-site-mode">Conteúdo na URL principal da instalação</label>
                             <select id="gamb-public-site-mode" data-opt="public_site_mode"><?php if(($options['public_site_mode']??'')==='wordpress'): ?><option value="wordpress" selected>WordPress legado — migrar para estático</option><?php endif; ?><option value="static" <?php selected($options['public_site_mode']??'static','static'); ?>>Publicação estática na URL principal</option></select></div>
-                            <p>Acesso nesta origem: <a href="<?php echo esc_url(home_url('/')); ?>" target="_blank" rel="noopener noreferrer"><?php echo esc_html(home_url('/')); ?></a></p></div>
+                            <p>Endereço usado neste acesso  <a href="<?php echo esc_url(home_url('/')); ?>" target="_blank" rel="noopener noreferrer"><?php echo esc_html(home_url('/')); ?></a></p></div>
                             <p data-public-site-status><?php echo esc_html(Publication_View::status()['message']); ?></p>
-                            <small>Estático é o padrão. Para validar arquivos, use o acesso WP privado abaixo. Perfis legados são preservados até a migração para estático.</small>
+                            <small>A publicação estática na URL principal exige entrega local e uma exportação completa. Use o acesso privado abaixo para conferir o WordPress original.</small>
                         </div>
                         <fieldset class="gamb-origin-section"><legend>1. Endereço da publicação</legend>
                             <div class="gamb-url-editor"><div><label class="gamb-field" for="gamb-public-url">URL pública completa</label><input id="gamb-public-url" type="url" data-public-url value="<?php echo esc_attr($saved_public_url?:Origin_Context::canonical()); ?>" placeholder="https://site.exemplo.org/portal/"></div>
                             <button type="button" class="button" data-use-project-url data-project-url="<?php echo esc_url(Origin_Context::canonical()); ?>">Usar URL padrão da instalação</button></div>
-                            <p class="gamb-help">Protocolo, domínio e caminho ficam neste único campo. Localhost e IP compartilham a mesma entrega; o acesso atual não altera o endereço salvo.</p>
+                            <p class="gamb-help">Informe onde os arquivos serão servidos. Para publicar na URL principal, use o endereço padrão da instalação. O acesso atual por IP é exibido acima e o destino só muda ao salvar.</p>
                         </fieldset>
                         <fieldset class="gamb-origin-section"><legend>2. WordPress original — validação privada</legend>
                             <div class="gamb-original-settings"><button type="button" class="button" role="switch" aria-checked="<?php echo Original_Access::enabled()?'true':'false'; ?>" data-gamb-original-toggle>Ativar URL acesso WP — <span data-gamb-original-state><?php echo Original_Access::enabled()?'Ativado':'Desativado'; ?></span></button><a class="button" data-gamb-original-open href="<?php echo Original_Access::enabled()?esc_url(Original_Access::url()):'#'; ?>" target="_blank" rel="noopener noreferrer" <?php if(!Original_Access::enabled())echo 'hidden'; ?>>Abrir WordPress original ↗</a></div>
@@ -569,7 +583,7 @@ class Admin_Controller
                             <option value="zip" <?php selected($options['delivery_method'], 'zip'); ?>>Arquivo ZIP</option>
                         </select>
                         </div>
-                        <div><?php $this->input('local_dir', 'Diretório local dedicado à publicação', $options); ?><div class="gamb-action-row"><button type="button" class="button" data-destination-suggest>Usar sugestão</button><button type="button" class="button" data-destination-check>Verificar pasta</button><button type="button" class="button" data-destination-create hidden disabled>Criar pasta</button></div></div></div><p data-destination-result role="status" aria-live="polite">Verifique a pasta antes de salvar. A criação só ocorre ao clicar em Criar pasta.</p><div class="gamb-form-grid">
+                        <div><?php $this->input('local_dir', 'Diretório local dedicado à publicação', $options); ?><div class="gamb-action-row"><button type="button" class="button" data-destination-suggest>Usar sugestão</button><button type="button" class="button" data-destination-check>Verificar pasta</button><button type="button" class="button" data-destination-create>Criar pasta</button></div></div></div><p data-destination-result role="status" aria-live="polite">Verifique a pasta antes de salvar. Use Criar pasta se ela ainda não existir.</p><div class="gamb-form-grid">
                         <div>
                         <label class="gamb-field" for="gamb-url-type">Formato dos endereços</label><select id="gamb-url-type" data-opt="destination_url_type">
                             <option value="relative" <?php selected($options['destination_url_type'], 'relative'); ?>>Relativo ao domínio</option>
@@ -606,8 +620,16 @@ class Admin_Controller
                         <h2>Automação e notificações</h2>
                         <?php $this->checkbox('single_enabled', 'Habilitar publicação a partir do editor', $options);
                         $this->checkbox('auto_export', 'Agendar publicação ao salvar conteúdo publicado', $options); ?>
-                        <?php $this->input('auto_export_delay', 'Espera mínima para agendamento, em segundos', $options, 'number');
-                        $this->input('webhook_url', 'Endereço opcional para notificar a publicação concluída', $options, 'url'); ?>
+                        <div class="gamb-form-grid">
+                            <div><?php $this->input('auto_export_delay', 'Espera mínima para agendamento, em segundos', $options, 'number'); ?></div>
+                            <div>
+                                <?php $this->input('publication_email', 'Endereço opcional para notificar a publicação concluída', array_merge($options, array('publication_email' => $options['publication_email'] ?: get_option('admin_email'))), 'email'); ?>
+                                <?php $this->checkbox('publication_email_enabled', 'Receber notificação por e-mail', $options); ?>
+                            </div>
+                        </div>
+                        <details><summary>Integração por webhook</summary>
+                            <?php $this->input('webhook_url', 'URL do webhook', $options, 'url'); ?>
+                        </details>
                         <p class="gamb-help">A atualização automática depende da execução do agendador do WordPress.</p>
                     </section>
                     <section class="gamb-panel" id="panel-performance" data-settings-panel hidden>
@@ -633,13 +655,17 @@ class Admin_Controller
                         <div><label class="gamb-field" for="gamb-monitor-proxies">Proxies explicitamente confiáveis — um IP por linha</label><textarea class="large-text code" rows="5" id="gamb-monitor-proxies" data-opt="version_monitor_trusted_proxies"><?php echo esc_textarea(implode("\n", (array)$options['version_monitor_trusted_proxies'])); ?></textarea></div>
                         </div>
                         <p>Deixe proxies vazios em conexões diretas. X-Forwarded-For só é considerado quando a conexão vem de um proxy informado. Não são aceitos CIDR, curingas, nomes de host ou autorização automática de loopback.</p>
-                    </section>
-                    <section class="gamb-panel" id="panel-monitor-query" hidden>
+                    <div class="gamb-monitor-query gamb-callout">
                         <h3>Endereços de consulta</h3>
-                        <p><a data-monitor-url href="<?php echo esc_url(rest_url('gamb-wp-static-guard/v1/wordpress-version')); ?>" target="_blank" rel="noopener noreferrer"><?php echo esc_html(rest_url('gamb-wp-static-guard/v1/wordpress-version')); ?></a></p>
-                        <p class="gamb-wrap-anywhere">Compatibilidade: <code><?php echo esc_html(rest_url('monitor-versao-wp')); ?></code> e <code><?php echo esc_html(rest_url('monitor-versao-wp/check')); ?></code>. A rota antiga <code>/meu-sistema/v1/versao</code> permanece removida.</p>
+                        <?php $monitor = Version_Monitor::status(); ?>
+                        <p class="gamb-wrap-anywhere"><a data-monitor-url href="<?php echo esc_url($monitor['url']); ?>" target="_blank" rel="noopener noreferrer"><?php echo esc_html($monitor['url']); ?></a></p>
+                        <details><summary>Rotas de compatibilidade</summary><ul>
+                            <li><a href="<?php echo esc_url($monitor['legacy_url']); ?>"><?php echo esc_html($monitor['legacy_url']); ?></a></li>
+                            <li><a href="<?php echo esc_url($monitor['check_url']); ?>"><?php echo esc_html($monitor['check_url']); ?></a></li>
+                        </ul></details>
                         <p data-monitor-status></p><button type="button" class="button" data-test-monitor>Verificar acesso desta origem</button>
-                        <pre data-monitor-result class="gamb-monitor-result"></pre>
+                        <pre data-monitor-result class="gamb-monitor-result" aria-live="polite" hidden></pre>
+                    </div>
                     </section>
                     <section class="gamb-panel" id="panel-backup" hidden>
                         <h2>Gerenciador de backups</h2>
@@ -651,13 +677,19 @@ class Admin_Controller
                         <h2 id="gamb-updates-heading">Atualizações do plugin</h2>
                         <p>As versões são consultadas no GitHub Releases. A instalação e a ativação das atualizações automáticas utilizam os controles nativos do WordPress.</p>
                         <p data-update-status role="status" aria-live="polite">Versão instalada: <?php echo esc_html(GAMB_STATIC_WP_VERSION); ?>.</p>
+                        <div class="gamb-action-row">
                         <button type="button" class="button" data-check-updates>Verificar atualizações agora</button>
                         <a class="button" href="<?php echo esc_url(admin_url('plugins.php')); ?>">Gerenciar atualizações no WordPress</a>
-                        <?php $this->input('github_update_repository', 'Repositório GitHub no formato owner/repo', $options); ?>
+                        </div>
+                        <div class="gamb-form-grid">
+                        <div><?php $this->input('github_update_repository', 'Repositório GitHub no formato owner/repo', $options); ?>
+                        <p class="gamb-help">O identificador owner/repo indica onde consultar as releases.</p></div>
+                        <div>
                         <label class="gamb-field" for="gamb-github-token">Token opcional para repositório privado</label>
-                        <input class="regular-text" type="password" id="gamb-github-token" data-opt="github_update_token" value="" autocomplete="new-password" <?php disabled(defined('GAMB_GITHUB_TOKEN')); ?>>
+                        <input class="regular-text" type="password" id="gamb-github-token" data-opt="github_update_token" value="" autocomplete="new-password" placeholder="<?php echo Gamb_GitHub_Updater::instance()->token() !== '' ? '***' : ''; ?>" <?php disabled(defined('GAMB_GITHUB_TOKEN')); ?>>
                         <p>O campo vazio preserva o token atual. O valor salvo é criptografado; a constante GAMB_GITHUB_TOKEN tem precedência e não é exibida.</p>
                         <label class="gamb-setting"><input type="checkbox" data-opt="github_clear_token" <?php disabled(defined('GAMB_GITHUB_TOKEN')); ?>> Remover token salvo</label>
+                        </div></div>
                     </section>
                     <section class="gamb-panel" id="panel-audit" data-settings-panel hidden>
                         <h2>Configuração da auditoria</h2>

@@ -8,7 +8,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 /**
- * Gamb WP Static Guard - Gerenciador Central de Opções e Perfil Padrão Seguro (v5.5.1).
+ * Gamb WP Static Guard - Gerenciador Central de Opções e Perfil Padrão Seguro (v5.5.2).
  *
  * Mantém compatibilidade com a chave 'gamb-wp-static-guard' no wp_options e separa claramente
  * as configurações de 1. STATIC (Conversão & Publicação) e 2. GUARD (Ocultação & Segurança).
@@ -17,7 +17,7 @@ class Options {
 
 	const OPTION_KEY  = 'gamb_wp_static_guard';
 	const VERSION_KEY = 'gamb_wp_static_guard_profile_version';
-	const VERSION     = '5.5.1';
+	const VERSION     = '5.5.2';
 
 	private static $instance = null;
 	private $options = array();
@@ -62,7 +62,7 @@ class Options {
 			'relative_path'                    => '',
 			'force_replace_url'                => true,
 			'clear_directory_before_export'    => true,
-			'delivery_method'                  => 'zip', // zip | local
+			'delivery_method'                  => 'local', // local | zip
 			'local_dir'                        => '',
 			'smart_crawl'                      => true,
 			'crawlers'                         => array(
@@ -119,6 +119,8 @@ class Options {
 			'include_pagination'     => true,
 			'include_sitemap' => true,
 			'webhook_url'                   => '',
+			'publication_email_enabled'     => false,
+			'publication_email'             => '',
 			'webhook_export_types'         => array( 'export', 'theme', 'update', 'single' ),
 			'auto_backup_before_export'        => false,
 

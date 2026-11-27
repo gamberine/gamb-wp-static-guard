@@ -142,4 +142,36 @@ require __DIR__ . '/insights.php';
 require __DIR__ . '/destination-audit.php';
 require __DIR__ . '/publication-view.php';
 require __DIR__ . '/origin-access.php';
+expect(\GambWPStaticGuard\Options::get_default_options()['delivery_method'] === 'local', 'Entrega local por padrão.');
+$destination = wp_normalize_path(__DIR__ . '/runtime/gamb-create-' . bin2hex(random_bytes(5)));
+$inspected = \GambWPStaticGuard\Publication_Destination::inspect($destination);
+expect(!is_wp_error($inspected) && !$inspected['exists'] && !file_exists($destination), 'Verificar destino sem criar.');
+$created = \GambWPStaticGuard\Publication_Destination::inspect($destination, true);
+expect(!is_wp_error($created) && $created['created'] && is_dir($destination), 'Criar destino válido com ação explícita.');
+rmdir($destination);
+
+function is_email($value) { return filter_var($value, FILTER_VALIDATE_EMAIL); }
+function wp_mail($to, $subject, $body) {
+    $GLOBALS['fixture_sent_mail'][] = array($to, $subject, $body);
+    return $GLOBALS['fixture_mail_result'];
+}
+$mail_options = \GambWPStaticGuard\Options::instance();
+$mail_options->set('webhook_url', '')->set('publication_email_enabled', false)->set('publication_email', '');
+$GLOBALS['fixture_options']['admin_email'] = 'admin@example.test';
+$GLOBALS['fixture_sent_mail'] = array();
+$GLOBALS['fixture_mail_result'] = true;
+$engine = new ReflectionClass(\GambWPStaticGuard\Static_Engine::class);
+$notify = $engine->getMethod('notify_publication');
+$notify->setAccessible(true);
+$instance = $engine->newInstanceWithoutConstructor();
+$notify->invoke($instance, 'export', 12);
+expect($GLOBALS['fixture_sent_mail'] === array(), 'E-mail depende de adesão.');
+$mail_options->set('publication_email_enabled', true);
+$notify->invoke($instance, 'export', 12);
+expect($GLOBALS['fixture_sent_mail'][0][0] === 'admin@example.test', 'Usar e-mail padrão do administrador.');
+$mail_options->set('publication_email', 'editor@example.test');
+$GLOBALS['fixture_mail_result'] = false;
+$notify->invoke($instance, 'export', 12);
+expect($GLOBALS['fixture_sent_mail'][1][0] === 'editor@example.test', 'Respeitar endereço de notificação personalizado.');
+expect(str_contains($mail_options->get('archive_status_messages')[0]['message'], 'não conseguiu enviar'), 'Registrar falha de envio.');
 echo $checks . " verificações independentes concluídas.\n";

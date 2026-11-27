@@ -57,7 +57,7 @@
     scrollbar-gutter: stable;
     scroll-padding: 8px;
 }
-.gamb-workspace-ready .gamb-content { min-height: 0; height: 100%; overflow: hidden; }
+.gamb-workspace-ready .gamb-content { min-height: 0; height: 94%; overflow: hidden; row-gap: 1rem; }
 .gamb-workspace-ready .gamb-panel {
     box-sizing: border-box;
     height: 100%;
@@ -279,8 +279,9 @@
 }
 
 .gamb-admin-header-info .gamb-releases-link {
-    flex       : 0 0 auto;
+    flex: 0 0 auto;
     white-space: nowrap;
+    border-radius: 8px;
 }
 
 .gamb-stats {
@@ -717,7 +718,19 @@
 .gamb-field-heading { display: block; margin-top: 10px; }
 .gamb-field-heading .gamb-field { display: inline; margin: 0; }
 .gamb-field-heading .gamb-setting { display: inline-flex; width: auto; margin: 0; }
-.gamb-info { margin-inline-start: 5px; width: 19px; height: 19px; padding: 0; border: 0; border-radius: 4px; color: #3346a3; background: transparent; font: 700 12px/1 Georgia, serif; vertical-align: 2px; cursor: pointer; }
+.gamb-info, .gamb-admin button.gamb-info {
+    margin-inline-start: 5px;
+    width: 19px;
+    height: 19px;
+    padding: 0;
+    border: 0;
+    border-radius: 100% !important;
+    color: #3346a3;
+    background: var(--wp-editor-canvas-background);
+    font: 600 11px / 1 Georgia, serif;
+    vertical-align: 7px;
+    cursor: pointer;
+}
 .gamb-info:hover, .gamb-info[aria-expanded=true] { background: #e4eaff; }
 
 .gamb-field-help { border-left: 3px solid #6375ba; background: #f4f6fc; padding: 8px 12px; margin: 8px 0 12px; color: #253045; }
@@ -770,4 +783,24 @@
     .gamb-project-row > .button { justify-self: start; }
     .gamb-settings-footer { position: fixed; inset-inline: 0; bottom: 0; z-index: 41; padding: 8px 16px; }
     .gamb-content:has(.gamb-settings-footer:not([hidden])) .gamb-panel { padding-bottom: 58px; }
+}
+
+.gamb-admin :is(button, .button) { border-radius: 8px; }
+.gamb-admin .button:not(.gamb-tab) { --gamb-button-color: #475569; --gamb-button-hover: #172033; color: var(--gamb-button-color); border-color: var(--gamb-button-color); background: #f6f7f7; }
+.gamb-admin .button.button-primary:not(.gamb-tab) { --gamb-button-color: #3545a1; --gamb-button-hover: #172674; }
+.gamb-admin .button.gamb-button-danger { --gamb-button-color: #b42318; --gamb-button-hover: #790c05; }
+.gamb-admin .button:not(.gamb-tab):not(:disabled):not([aria-disabled="true"]):hover { color: var(--gamb-button-hover); border-color: var(--gamb-button-hover); background: #f6f7f7; }
+.gamb-admin :is(.gamb-action-row, .gamb-backup-actions, .gamb-original-settings, .gamb-process-actions, .gamb-url-editor, .gamb-form-grid) { gap: 1rem; }
+.gamb-admin .gamb-url-editor { display: grid; grid-template-columns: minmax(0, 1fr) auto; }
+.gamb-url-editor > .button { white-space: nowrap; }
+.gamb-backup-zip { color: #3545a1; font-weight: 600; }
+.gamb-backup-sql { color: #785009; font-weight: 600; }
+.gamb-monitor-query { display: grid; gap: 1rem; margin-top: 1rem; justify-items: start; }
+.gamb-monitor-query :is(h3, p, pre) { margin: 0; }
+.gamb-monitor-result { width: 100%; box-sizing: border-box; }
+.gamb-update-activity ul { max-height: 20rem; overflow: auto; overflow-wrap: anywhere; }
+
+@media (max-width: 600px) {
+    .gamb-admin .gamb-url-editor { grid-template-columns: 1fr; }
+    .gamb-url-editor > .button { justify-self: start; }
 }

@@ -41,7 +41,8 @@ for(const name of ['sectionBadges','publication','backups']){
   const table=nodes['[data-backup-list]'].children[0],row=table.children[1].children[0];
   const cell=row.children[3],controls=cell.children[0],[download,remove]=controls.children;
   assert.equal(cell.tag,'td');assert.equal(controls.className,'gamb-backup-actions');
-  assert.equal(download.className,'button');assert.equal(remove.className,'button');
+  assert.equal(row.children[0].className,'gamb-backup-sql');
+  assert.equal(download.className,'button button-primary');assert.equal(remove.className,'button gamb-button-danger');
   assert.equal(download.href,rows[0].download_url);
   assert.equal(download.attributes['aria-label'],'Baixar fixture.sql');
   assert.equal(remove.attributes['aria-label'],'Excluir fixture.sql');
