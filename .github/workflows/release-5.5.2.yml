@@ -1,0 +1,40 @@
+name: Publicar Static Guard 5.5.2
+on:
+  push:
+    branches: [codex/release-5.5.2]
+    paths: [.github/workflows/release-5.5.2.yml]
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      TARGET: b0db28bc69e5a18f233cc6b414f4b11b7976e53d
+      TAG: v5.5.2
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: b0db28bc69e5a18f233cc6b414f4b11b7976e53d
+          persist-credentials: false
+      - uses: shivammathur/setup-php@d52fc211a0436f8839a587b3b5b8efddab4744ea
+        with:
+          php-version: '8.3'
+          extensions: dom, mbstring, openssl
+          coverage: none
+      - name: Testar e montar distribuição
+        run: |
+          set -eu
+          test "$(git rev-parse HEAD)" = "$TARGET"
+          php -d error_reporting=E_ALL tests/run.php
+          node tests/admin-ui.cjs
+          node tests/original-access.cjs
+          python3 scripts/build.py
+          python3 -m zipfile -t dist/gamb-wp-static-guard-5.5.2.zip
+          (cd dist && sha256sum -c SHA256SUMS)
+      - name: Publicar release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$TAG" dist/gamb-wp-static-guard-5.5.2.zip dist/SHA256SUMS \
+            --target "$TARGET" --title "Gamb WP Static Guard 5.5.2" \
+            --notes "Entrega local por padrão e criação explícita de pasta no Windows. Notificações de publicação por e-mail, consultas reunidas no monitor, ajustes no painel e registro dos arquivos da última entrega."
